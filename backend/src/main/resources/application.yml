@@ -21,3 +21,13 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+
+api:
+  football:
+    base-url: ${FOOTBALL_API_URL}
+    api-key: ${FOOTBALL_API_KEY}
+    whitelisted-ids: 1,2,3,39,61,78,135,140,94,88
+
+competition:
+  sync:
+    cron: '0 0 0 1 * *' # Every first in the month
