@@ -19,8 +19,6 @@ public class RestClientConfiguration {
             @Value("${api.football.api-key:NOT_SET}") String apiKey) {
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
-        log.info("Initializing RestClient with url: {}", baseUrl);
-        log.info("Initializing RestClient with api key: {}", apiKey);
     };
 
     @Bean
