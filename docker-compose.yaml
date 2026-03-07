@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: ./backend
+    container_name: match-predictor-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_USER=${SUPABASE_USER}
+      - SUPABASE_PASSWORD=${SUPABASE_PASSWORD}
+    networks:
+      - app-network
+
+  frontend:
+    build: ./frontend
+    container_name: match-predictor-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
