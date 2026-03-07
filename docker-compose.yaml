@@ -2,16 +2,13 @@ services:
   backend:
     build: ./backend
     container_name: match-predictor-backend
-    ports:
-      - "8080:8080"
+    network_mode: host
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_USER=${SUPABASE_USER}
       - SUPABASE_PASSWORD=${SUPABASE_PASSWORD}
       - FOOTBALL_API_URL=${FOOTBALL_API_URL}
       - FOOTBALL_API_KEY=${FOOTBALL_API_KEY}
-    networks:
-      - app-network
 
   frontend:
     build: ./frontend
@@ -20,9 +17,3 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
