@@ -1,4 +1,4 @@
-package byteblaze.backend.competition;
+package byteblaze.backend.competition.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
