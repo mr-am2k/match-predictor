@@ -9,15 +9,15 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# Serve stage
-FROM node:24-alpine
+# Serve stage with nginx
+FROM nginx:alpine
 
-WORKDIR /app
+# Copy built assets
+COPY --from=build /app/dist /usr/share/nginx/html
 
-RUN npm install -g serve
-
-COPY --from=build /app/dist ./dist
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 3000
 
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["nginx", "-g", "daemon off;"]

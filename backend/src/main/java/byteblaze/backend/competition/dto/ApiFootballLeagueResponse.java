@@ -1,4 +1,4 @@
-package byteblaze.backend.competition;
+package byteblaze.backend.competition.dto;
 
 import java.util.List;
 

@@ -31,3 +31,15 @@ api:
 competition:
   sync:
     cron: '0 0 0 1 * *' # Every first in the month
+
+jwt:
+  secret-key: ${JWT_SECRET_KEY}
+  access-token:
+    expiration: 900000       # 15 minutes
+  refresh-token:
+    expiration: 604800000    # 7 days
+
+cookie:
+  domain: ${COOKIE_DOMAIN:localhost}
+  secure: ${COOKIE_SECURE:false}
+  same-site: ${COOKIE_SAME_SITE:Lax}

@@ -15,5 +15,7 @@ services:
     container_name: match-predictor-frontend
     ports:
       - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - backend

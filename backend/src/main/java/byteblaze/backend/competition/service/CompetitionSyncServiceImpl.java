@@ -1,5 +1,8 @@
-package byteblaze.backend.competition;
+package byteblaze.backend.competition.service;
 
+import byteblaze.backend.competition.dto.ApiFootballLeagueResponse;
+import byteblaze.backend.competition.entity.Competition;
+import byteblaze.backend.competition.repository.CompetitionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
