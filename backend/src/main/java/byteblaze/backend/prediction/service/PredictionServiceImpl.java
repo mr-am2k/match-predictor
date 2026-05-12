@@ -15,6 +15,7 @@ import byteblaze.backend.prediction.dto.FixtureWithPrediction;
 import byteblaze.backend.prediction.dto.GameweekFixturesResponse;
 import byteblaze.backend.prediction.dto.GameweekSummaryResponse;
 import byteblaze.backend.prediction.dto.MyPrediction;
+import byteblaze.backend.prediction.dto.PlayerPick;
 import byteblaze.backend.prediction.dto.PlayerSummary;
 import byteblaze.backend.prediction.dto.TeamSummary;
 import byteblaze.backend.prediction.dto.UpsertPredictionRequest;
@@ -209,18 +210,18 @@ public class PredictionServiceImpl implements PredictionService {
                 .collect(Collectors.toMap(Prediction::getFixtureId, p -> p));
 
         List<UUID> predictionIds = userPredictions.stream().map(Prediction::getId).toList();
-        Map<UUID, List<Long>> scorersByPredictionId = new HashMap<>();
-        Map<UUID, List<Long>> assistersByPredictionId = new HashMap<>();
+        Map<UUID, List<PlayerPick>> scorersByPredictionId = new HashMap<>();
+        Map<UUID, List<PlayerPick>> assistersByPredictionId = new HashMap<>();
         if (!predictionIds.isEmpty()) {
             for (PredictionScorer s : predictionScorerRepository.findAllByPredictionIdIn(predictionIds)) {
                 scorersByPredictionId
                         .computeIfAbsent(s.getPredictionId(), k -> new java.util.ArrayList<>())
-                        .add(s.getPlayerId());
+                        .add(new PlayerPick(s.getPlayerId(), s.getCount()));
             }
             for (PredictionAssister a : predictionAssisterRepository.findAllByPredictionIdIn(predictionIds)) {
                 assistersByPredictionId
                         .computeIfAbsent(a.getPredictionId(), k -> new java.util.ArrayList<>())
-                        .add(a.getPlayerId());
+                        .add(new PlayerPick(a.getPlayerId(), a.getCount()));
             }
         }
 
@@ -318,10 +319,10 @@ public class PredictionServiceImpl implements PredictionService {
         }
 
         // Normalise lists to mutable copies, treating null as empty.
-        List<Long> scorerIds = req.scorerPlayerIds() == null ? List.of() : req.scorerPlayerIds();
-        List<Long> assisterIds = req.assisterPlayerIds() == null ? List.of() : req.assisterPlayerIds();
+        List<PlayerPick> scorers = req.scorers() == null ? List.of() : req.scorers();
+        List<PlayerPick> assisters = req.assisters() == null ? List.of() : req.assisters();
 
-        validateRequest(req, fixture, scorerIds, assisterIds, competitionId, seasonYear);
+        validateRequest(req, fixture, scorers, assisters, competitionId, seasonYear);
 
         Optional<Prediction> existing = predictionRepository
                 .findByUserIdAndLeagueIdAndFixtureId(currentUser.getId(), leagueId, fixtureId);
@@ -344,24 +345,23 @@ public class PredictionServiceImpl implements PredictionService {
         predictionScorerRepository.deleteByPredictionId(predictionId);
         predictionAssisterRepository.deleteByPredictionId(predictionId);
 
-        List<Long> distinctScorers = scorerIds.stream().distinct().toList();
-        List<Long> distinctAssisters = assisterIds.stream().distinct().toList();
-
-        if (!distinctScorers.isEmpty()) {
-            List<PredictionScorer> rows = distinctScorers.stream()
-                    .map(pid -> PredictionScorer.builder()
+        if (!scorers.isEmpty()) {
+            List<PredictionScorer> rows = scorers.stream()
+                    .map(pick -> PredictionScorer.builder()
                             .predictionId(predictionId)
-                            .playerId(pid)
+                            .playerId(pick.playerId())
+                            .count(pick.count())
                             .build())
                     .toList();
             predictionScorerRepository.saveAll(rows);
         }
 
-        if (!distinctAssisters.isEmpty()) {
-            List<PredictionAssister> rows = distinctAssisters.stream()
-                    .map(pid -> PredictionAssister.builder()
+        if (!assisters.isEmpty()) {
+            List<PredictionAssister> rows = assisters.stream()
+                    .map(pick -> PredictionAssister.builder()
                             .predictionId(predictionId)
-                            .playerId(pid)
+                            .playerId(pick.playerId())
+                            .count(pick.count())
                             .build())
                     .toList();
             predictionAssisterRepository.saveAll(rows);
@@ -372,8 +372,8 @@ public class PredictionServiceImpl implements PredictionService {
                 prediction.isPredictedDraw(),
                 prediction.getHomeScore(),
                 prediction.getAwayScore(),
-                distinctScorers,
-                distinctAssisters
+                scorers,
+                assisters
         );
     }
 
@@ -391,8 +391,8 @@ public class PredictionServiceImpl implements PredictionService {
 
     private void validateRequest(UpsertPredictionRequest req,
                                   Fixture fixture,
-                                  List<Long> scorerIds,
-                                  List<Long> assisterIds,
+                                  List<PlayerPick> scorers,
+                                  List<PlayerPick> assisters,
                                   Long competitionId,
                                   Integer seasonYear) {
         Long home = fixture.getHomeTeamId();
@@ -400,8 +400,8 @@ public class PredictionServiceImpl implements PredictionService {
 
         // Reject any scorer/assister picks when either score is missing — the caps are now
         // derived entirely from the predicted score, so picks without both scores are ambiguous.
-        boolean hasScorerPicks = req.scorerPlayerIds() != null && !req.scorerPlayerIds().isEmpty();
-        boolean hasAssisterPicks = req.assisterPlayerIds() != null && !req.assisterPlayerIds().isEmpty();
+        boolean hasScorerPicks = req.scorers() != null && !req.scorers().isEmpty();
+        boolean hasAssisterPicks = req.assisters() != null && !req.assisters().isEmpty();
         if ((hasScorerPicks || hasAssisterPicks)
                 && (req.homeScore() == null || req.awayScore() == null)) {
             throw new PredictionValidationException(
@@ -460,17 +460,29 @@ public class PredictionServiceImpl implements PredictionService {
             }
         }
 
-        if (hasDuplicates(scorerIds)) {
-            throw new PredictionValidationException("Duplicate player ids in scorerPlayerIds");
+        // Belt-and-suspenders: bean validation covers these, but guard against direct service callers.
+        for (PlayerPick pick : scorers) {
+            if (pick == null || pick.playerId() == null || pick.count() == null || pick.count() < 1) {
+                throw new PredictionValidationException("Invalid scorer pick");
+            }
         }
-        if (hasDuplicates(assisterIds)) {
-            throw new PredictionValidationException("Duplicate player ids in assisterPlayerIds");
+        for (PlayerPick pick : assisters) {
+            if (pick == null || pick.playerId() == null || pick.count() == null || pick.count() < 1) {
+                throw new PredictionValidationException("Invalid assister pick");
+            }
         }
 
-        if (!scorerIds.isEmpty() || !assisterIds.isEmpty()) {
+        if (hasDuplicatePlayerIds(scorers)) {
+            throw new PredictionValidationException("Duplicate player ids in scorers");
+        }
+        if (hasDuplicatePlayerIds(assisters)) {
+            throw new PredictionValidationException("Duplicate player ids in assisters");
+        }
+
+        if (!scorers.isEmpty() || !assisters.isEmpty()) {
             Set<Long> uniquePlayers = new HashSet<>();
-            uniquePlayers.addAll(scorerIds);
-            uniquePlayers.addAll(assisterIds);
+            for (PlayerPick p : scorers) uniquePlayers.add(p.playerId());
+            for (PlayerPick p : assisters) uniquePlayers.add(p.playerId());
             List<TeamPlayer> memberships = teamPlayerRepository
                     .findAllByPlayerIdInAndCompetitionIdAndSeasonYearAndRemovedAtIsNull(
                             uniquePlayers, competitionId, seasonYear);
@@ -500,36 +512,40 @@ public class PredictionServiceImpl implements PredictionService {
 
             // Scorer/assister count consistency with score — only enforce when BOTH scores are provided.
             if (req.homeScore() != null && req.awayScore() != null) {
-                int homeScorerCount = 0;
-                int awayScorerCount = 0;
-                for (Long pid : scorerIds) {
-                    if (homePlayerIds.contains(pid)) homeScorerCount++;
-                    else if (awayPlayerIds.contains(pid)) awayScorerCount++;
-                }
+                int homeScorerCount = scorers.stream()
+                        .filter(p -> homePlayerIds.contains(p.playerId()))
+                        .mapToInt(PlayerPick::count)
+                        .sum();
+                int awayScorerCount = scorers.stream()
+                        .filter(p -> awayPlayerIds.contains(p.playerId()))
+                        .mapToInt(PlayerPick::count)
+                        .sum();
                 if (homeScorerCount > req.homeScore()) {
-                    log.debug("Validation fail: {} home scorers but homeScore={}", homeScorerCount, req.homeScore());
+                    log.debug("Validation fail: home scorer total {} but homeScore={}", homeScorerCount, req.homeScore());
                     throw new PredictionValidationException(
                             "Too many home scorers — your home score is " + req.homeScore());
                 }
                 if (awayScorerCount > req.awayScore()) {
-                    log.debug("Validation fail: {} away scorers but awayScore={}", awayScorerCount, req.awayScore());
+                    log.debug("Validation fail: away scorer total {} but awayScore={}", awayScorerCount, req.awayScore());
                     throw new PredictionValidationException(
                             "Too many away scorers — your away score is " + req.awayScore());
                 }
 
-                int homeAssisterCount = 0;
-                int awayAssisterCount = 0;
-                for (Long pid : assisterIds) {
-                    if (homePlayerIds.contains(pid)) homeAssisterCount++;
-                    else if (awayPlayerIds.contains(pid)) awayAssisterCount++;
-                }
+                int homeAssisterCount = assisters.stream()
+                        .filter(p -> homePlayerIds.contains(p.playerId()))
+                        .mapToInt(PlayerPick::count)
+                        .sum();
+                int awayAssisterCount = assisters.stream()
+                        .filter(p -> awayPlayerIds.contains(p.playerId()))
+                        .mapToInt(PlayerPick::count)
+                        .sum();
                 if (homeAssisterCount > req.homeScore()) {
-                    log.debug("Validation fail: {} home assisters but homeScore={}", homeAssisterCount, req.homeScore());
+                    log.debug("Validation fail: home assister total {} but homeScore={}", homeAssisterCount, req.homeScore());
                     throw new PredictionValidationException(
                             "Too many home assisters — your home score is " + req.homeScore());
                 }
                 if (awayAssisterCount > req.awayScore()) {
-                    log.debug("Validation fail: {} away assisters but awayScore={}", awayAssisterCount, req.awayScore());
+                    log.debug("Validation fail: away assister total {} but awayScore={}", awayAssisterCount, req.awayScore());
                     throw new PredictionValidationException(
                             "Too many away assisters — your away score is " + req.awayScore());
                 }
@@ -537,7 +553,7 @@ public class PredictionServiceImpl implements PredictionService {
         }
     }
 
-    private static boolean hasDuplicates(List<Long> ids) {
-        return ids.stream().distinct().count() != ids.size();
+    private static boolean hasDuplicatePlayerIds(List<PlayerPick> picks) {
+        return picks.stream().map(PlayerPick::playerId).distinct().count() != picks.size();
     }
 }

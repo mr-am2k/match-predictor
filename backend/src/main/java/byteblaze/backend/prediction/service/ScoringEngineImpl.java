@@ -3,6 +3,7 @@ package byteblaze.backend.prediction.service;
 import byteblaze.backend.fixture.entity.Fixture;
 import byteblaze.backend.fixture.entity.FixtureEvent;
 import byteblaze.backend.fixture.entity.FixtureEventType;
+import byteblaze.backend.prediction.dto.PlayerPick;
 import byteblaze.backend.prediction.entity.Prediction;
 import byteblaze.backend.scoring.rules.entity.LeagueScoringRules;
 import tools.jackson.core.JacksonException;
@@ -14,11 +15,10 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Default {@link ScoringEngine} implementation. Pure — no repository or
@@ -38,8 +38,8 @@ public class ScoringEngineImpl implements ScoringEngine {
     @Override
     public ScoringResult score(
             Prediction prediction,
-            List<Long> scorerPlayerIds,
-            List<Long> assisterPlayerIds,
+            List<PlayerPick> scorers,
+            List<PlayerPick> assisters,
             Fixture fixture,
             List<FixtureEvent> events,
             LeagueScoringRules rules
@@ -52,10 +52,10 @@ public class ScoringEngineImpl implements ScoringEngine {
         int exactScorePoints = scoreExactScore(prediction, fixture, rules);
 
         List<Map<String, Object>> scorerDetail = new ArrayList<>();
-        ScorerTally scorerTally = scoreScorers(scorerPlayerIds, events, rules, scorerDetail);
+        PickTally scorerTally = scoreScorers(scorers, events, rules, scorerDetail);
 
         List<Map<String, Object>> assisterDetail = new ArrayList<>();
-        AssisterTally assisterTally = scoreAssisters(assisterPlayerIds, events, rules, assisterDetail);
+        PickTally assisterTally = scoreAssisters(assisters, events, rules, assisterDetail);
 
         int baseTotal = winnerPoints + exactScorePoints + scorerTally.points + assisterTally.points;
 
@@ -133,72 +133,79 @@ public class ScoringEngineImpl implements ScoringEngine {
         return scoresMatch ? rules.getMatchExactScorePoints() : 0;
     }
 
-    private ScorerTally scoreScorers(
-            List<Long> scorerPlayerIds,
+    private PickTally scoreScorers(
+            List<PlayerPick> scorers,
             List<FixtureEvent> events,
             LeagueScoringRules rules,
             List<Map<String, Object>> detailOut
     ) {
-        Set<Long> actualScorers = new HashSet<>();
+        Map<Long, Integer> actualGoalsByPlayer = new HashMap<>();
         for (FixtureEvent e : events) {
-            if (e.getType() == FixtureEventType.GOAL && !OWN_GOAL_DETAIL.equalsIgnoreCase(e.getDetail())) {
-                actualScorers.add(e.getPlayerId());
+            if (e.getType() == FixtureEventType.GOAL
+                    && !OWN_GOAL_DETAIL.equalsIgnoreCase(e.getDetail())) {
+                actualGoalsByPlayer.merge(e.getPlayerId(), 1, Integer::sum);
             }
         }
 
-        Set<Long> seen = new HashSet<>();
         int total = 0;
         boolean anyHit = false;
-        for (Long pid : scorerPlayerIds) {
-            if (pid == null || !seen.add(pid)) {
+        for (PlayerPick pick : scorers) {
+            if (pick == null || pick.playerId() == null || pick.count() == null) {
                 continue;
             }
-            boolean hit = actualScorers.contains(pid);
-            int points = hit ? rules.getMatchScorerPoints() : 0;
-            total += points;
-            if (hit) {
+            int actual = actualGoalsByPlayer.getOrDefault(pick.playerId(), 0);
+            boolean correct = actual == pick.count();
+            int points = correct ? rules.getMatchScorerPoints() : 0;
+            if (correct) {
+                total += points;
                 anyHit = true;
             }
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("playerId", pid);
+            row.put("playerId", pick.playerId());
+            row.put("predicted", pick.count());
+            row.put("actual", actual);
+            row.put("correct", correct);
             row.put("points", points);
             detailOut.add(row);
         }
-        return new ScorerTally(total, anyHit);
+        return new PickTally(total, anyHit);
     }
 
-    private AssisterTally scoreAssisters(
-            List<Long> assisterPlayerIds,
+    private PickTally scoreAssisters(
+            List<PlayerPick> assisters,
             List<FixtureEvent> events,
             LeagueScoringRules rules,
             List<Map<String, Object>> detailOut
     ) {
-        Set<Long> actualAssisters = new HashSet<>();
+        Map<Long, Integer> actualAssistsByPlayer = new HashMap<>();
         for (FixtureEvent e : events) {
             if (e.getType() == FixtureEventType.ASSIST) {
-                actualAssisters.add(e.getPlayerId());
+                actualAssistsByPlayer.merge(e.getPlayerId(), 1, Integer::sum);
             }
         }
 
-        Set<Long> seen = new HashSet<>();
         int total = 0;
         boolean anyHit = false;
-        for (Long pid : assisterPlayerIds) {
-            if (pid == null || !seen.add(pid)) {
+        for (PlayerPick pick : assisters) {
+            if (pick == null || pick.playerId() == null || pick.count() == null) {
                 continue;
             }
-            boolean hit = actualAssisters.contains(pid);
-            int points = hit ? rules.getMatchAssisterPoints() : 0;
-            total += points;
-            if (hit) {
+            int actual = actualAssistsByPlayer.getOrDefault(pick.playerId(), 0);
+            boolean correct = actual == pick.count();
+            int points = correct ? rules.getMatchAssisterPoints() : 0;
+            if (correct) {
+                total += points;
                 anyHit = true;
             }
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("playerId", pid);
+            row.put("playerId", pick.playerId());
+            row.put("predicted", pick.count());
+            row.put("actual", actual);
+            row.put("correct", correct);
             row.put("points", points);
             detailOut.add(row);
         }
-        return new AssisterTally(total, anyHit);
+        return new PickTally(total, anyHit);
     }
 
     private static BigDecimal resolveMultiplier(int categoriesHit, LeagueScoringRules rules) {
@@ -221,9 +228,6 @@ public class ScoringEngineImpl implements ScoringEngine {
         return rules.getUpdatedAt().toInstant(ZoneOffset.UTC).toEpochMilli();
     }
 
-    private record ScorerTally(int points, boolean anyHit) {
-    }
-
-    private record AssisterTally(int points, boolean anyHit) {
+    private record PickTally(int points, boolean anyHit) {
     }
 }

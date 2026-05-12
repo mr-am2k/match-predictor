@@ -1,5 +1,7 @@
 package byteblaze.backend.prediction.dto;
 
+import jakarta.validation.Valid;
+
 import java.util.List;
 
 public record UpsertPredictionRequest(
@@ -7,7 +9,7 @@ public record UpsertPredictionRequest(
         boolean predictedDraw,
         Integer homeScore,
         Integer awayScore,
-        List<Long> scorerPlayerIds,
-        List<Long> assisterPlayerIds
+        @Valid List<PlayerPick> scorers,
+        @Valid List<PlayerPick> assisters
 ) {
 }

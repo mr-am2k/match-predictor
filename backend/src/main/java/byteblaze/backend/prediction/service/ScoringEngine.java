@@ -2,6 +2,7 @@ package byteblaze.backend.prediction.service;
 
 import byteblaze.backend.fixture.entity.Fixture;
 import byteblaze.backend.fixture.entity.FixtureEvent;
+import byteblaze.backend.prediction.dto.PlayerPick;
 import byteblaze.backend.prediction.entity.Prediction;
 import byteblaze.backend.scoring.rules.entity.LeagueScoringRules;
 
@@ -23,8 +24,8 @@ public interface ScoringEngine {
 
     ScoringResult score(
             Prediction prediction,
-            List<Long> scorerPlayerIds,
-            List<Long> assisterPlayerIds,
+            List<PlayerPick> scorers,
+            List<PlayerPick> assisters,
             Fixture fixture,
             List<FixtureEvent> events,
             LeagueScoringRules rules

@@ -5,6 +5,7 @@ import byteblaze.backend.fixture.entity.FixtureEvent;
 import byteblaze.backend.fixture.event.FixtureSettledEvent;
 import byteblaze.backend.fixture.repository.FixtureEventRepository;
 import byteblaze.backend.fixture.repository.FixtureRepository;
+import byteblaze.backend.prediction.dto.PlayerPick;
 import byteblaze.backend.prediction.entity.Prediction;
 import byteblaze.backend.prediction.entity.PredictionAssister;
 import byteblaze.backend.prediction.entity.PredictionScore;
@@ -27,14 +28,12 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -85,16 +84,16 @@ public class FixtureSettledListener {
         List<FixtureEvent> events = eventRepo.findAllByFixtureId(fixture.getId());
 
         List<UUID> predictionIds = predictions.stream().map(Prediction::getId).toList();
-        Map<UUID, List<Long>> scorerMap = groupByPrediction(
-                scorerRepo.findAllByPredictionIdIn(predictionIds),
-                PredictionScorer::getPredictionId,
-                PredictionScorer::getPlayerId
-        );
-        Map<UUID, List<Long>> assisterMap = groupByPrediction(
-                assisterRepo.findAllByPredictionIdIn(predictionIds),
-                PredictionAssister::getPredictionId,
-                PredictionAssister::getPlayerId
-        );
+        Map<UUID, List<PlayerPick>> scorerMap = new HashMap<>();
+        for (PredictionScorer s : scorerRepo.findAllByPredictionIdIn(predictionIds)) {
+            scorerMap.computeIfAbsent(s.getPredictionId(), k -> new java.util.ArrayList<>())
+                    .add(new PlayerPick(s.getPlayerId(), s.getCount()));
+        }
+        Map<UUID, List<PlayerPick>> assisterMap = new HashMap<>();
+        for (PredictionAssister a : assisterRepo.findAllByPredictionIdIn(predictionIds)) {
+            assisterMap.computeIfAbsent(a.getPredictionId(), k -> new java.util.ArrayList<>())
+                    .add(new PlayerPick(a.getPlayerId(), a.getCount()));
+        }
 
         // Load rules once per distinct league to avoid N+1 during scoring.
         Set<UUID> leagueIds = predictions.stream().map(Prediction::getLeagueId).collect(Collectors.toSet());
@@ -118,10 +117,10 @@ public class FixtureSettledListener {
                 skipped++;
                 continue;
             }
-            List<Long> scorerIds = scorerMap.getOrDefault(p.getId(), List.of());
-            List<Long> assisterIds = assisterMap.getOrDefault(p.getId(), List.of());
+            List<PlayerPick> scorerPicks = scorerMap.getOrDefault(p.getId(), List.of());
+            List<PlayerPick> assisterPicks = assisterMap.getOrDefault(p.getId(), List.of());
 
-            ScoringResult result = scoringEngine.score(p, scorerIds, assisterIds, fixture, events, rules);
+            ScoringResult result = scoringEngine.score(p, scorerPicks, assisterPicks, fixture, events, rules);
 
             PredictionScore score = PredictionScore.builder()
                     .predictionId(p.getId())
@@ -141,18 +140,5 @@ public class FixtureSettledListener {
     private void markSettled(Fixture fixture) {
         fixture.setSettledAt(LocalDateTime.now());
         fixtureRepo.save(fixture);
-    }
-
-    private <T> Map<UUID, List<Long>> groupByPrediction(
-            Collection<T> rows,
-            Function<T, UUID> keyFn,
-            Function<T, Long> valueFn
-    ) {
-        Map<UUID, List<Long>> out = new HashMap<>();
-        for (T row : rows) {
-            out.computeIfAbsent(keyFn.apply(row), k -> new java.util.ArrayList<>())
-                    .add(valueFn.apply(row));
-        }
-        return out;
     }
 }
