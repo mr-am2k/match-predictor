@@ -23,14 +23,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function checkAuth() {
+    let current: User | null = null;
     try {
-      const currentUser = await authApi.getCurrentUser();
-      setUser(currentUser);
+      current = await authApi.getCurrentUser();
     } catch {
-      setUser(null);
-    } finally {
-      setIsLoading(false);
+      current = null;
     }
+    if (!current) {
+      try {
+        current = await authApi.refreshToken();
+      } catch {
+        current = null;
+      }
+    }
+    setUser(current);
+    setIsLoading(false);
   }
 
   async function login(data: LoginRequest) {

@@ -8,7 +8,7 @@ import byteblaze.backend.auth.entity.Role;
 import byteblaze.backend.auth.entity.User;
 import byteblaze.backend.auth.repository.UserRepository;
 import byteblaze.backend.auth.util.CookieUtil;
-import byteblaze.backend.exception.AuthException;
+import byteblaze.backend.auth.exception.AuthException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;

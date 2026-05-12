@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Trophy, LogIn, UserPlus, LogOut, LayoutDashboard } from 'lucide-react';
+import { Trophy, LogIn, UserPlus, LogOut, LayoutDashboard, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/Button';
 
@@ -36,6 +36,13 @@ export function Navbar() {
                   <Link to="/dashboard">
                     <Button variant="ghost" size="sm" icon={<LayoutDashboard className="w-4 h-4" />}>
                       Dashboard
+                    </Button>
+                  </Link>
+                )}
+                {user?.role === 'ADMIN' && (
+                  <Link to="/admin/competitions">
+                    <Button variant="ghost" size="sm" icon={<Shield className="w-4 h-4" />}>
+                      Admin
                     </Button>
                   </Link>
                 )}

@@ -25,6 +25,10 @@ public class Competition {
     private LocalDate seasonStart;
     private LocalDate seasonEnd;
     private LocalDateTime lastSyncedAt;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean active = true;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

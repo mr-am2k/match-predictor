@@ -4,6 +4,7 @@ import byteblaze.backend.competition.dto.ApiFootballLeagueResponse;
 import byteblaze.backend.competition.entity.Competition;
 import byteblaze.backend.competition.repository.CompetitionRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -21,7 +22,7 @@ public class CompetitionSyncServiceImpl implements CompetitionSyncService {
 
     public CompetitionSyncServiceImpl(
             final CompetitionRepository competitionRepository,
-            final RestClient restClient,
+            @Qualifier("restClientExternalApi") final RestClient restClient,
             @Value("#{'${api.football.whitelisted-ids}'.split(',')}") List<Long> whitelistedIds) {
         this.competitionRepository = competitionRepository;
         this.restClient = restClient;
@@ -48,6 +49,7 @@ public class CompetitionSyncServiceImpl implements CompetitionSyncService {
                 .toList();
 
         competitionRepository.saveAll(competitions);
+
         log.info("Synced {} competitions", competitions.size());
     }
 

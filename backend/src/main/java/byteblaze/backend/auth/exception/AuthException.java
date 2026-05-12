@@ -1,4 +1,4 @@
-package byteblaze.backend.exception;
+package byteblaze.backend.auth.exception;
 
 public class AuthException extends RuntimeException {
 
