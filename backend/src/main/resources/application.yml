@@ -27,6 +27,17 @@ api:
     base-url: ${FOOTBALL_API_URL}
     api-key: ${FOOTBALL_API_KEY}
     whitelisted-ids: 1,2,3,39,61,78,135,140,94,88
+    daily-call-limit: 100
+
+sync:
+  scheduler:
+    enabled: true
+
+scoring:
+  winner-points: 1
+  exact-score-points: 2
+  scorer-points: 3
+  assister-points: 3
 
 competition:
   sync:

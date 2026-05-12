@@ -1,5 +1,7 @@
-import { Link } from 'react-router-dom';
-import { Trophy, TrendingUp, Users, Zap, ArrowRight } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import { Trophy, TrendingUp, Users, Zap, ArrowRight, Search, KeyRound } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +26,16 @@ const features = [
 
 export function HomePage() {
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const [showCodeInput, setShowCodeInput] = useState(false);
+  const [codeValue, setCodeValue] = useState('');
+
+  const handleJoinByCode = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = codeValue.trim();
+    if (!trimmed) return;
+    navigate(`/leagues/join/${encodeURIComponent(trimmed)}`);
+  };
 
   return (
     <div className="min-h-screen">
@@ -47,12 +59,25 @@ export function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               {isAuthenticated ? (
-                <Link to="/dashboard">
-                  <Button size="lg" className="bg-white text-indigo-600 hover:bg-gray-100 w-full sm:w-auto">
-                    Go to Dashboard
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </Button>
-                </Link>
+                <>
+                  <Link to="/leagues/new">
+                    <Button size="lg" className="bg-white text-indigo-600 hover:bg-gray-100 w-full sm:w-auto">
+                      Create your own league
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </Button>
+                  </Link>
+                  <Link to="/leagues/browse">
+                    <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 w-full sm:w-auto">
+                      <Search className="w-5 h-5 mr-2" />
+                      Browse public leagues
+                    </Button>
+                  </Link>
+                  <Link to="/dashboard">
+                    <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 w-full sm:w-auto">
+                      Go to Dashboard
+                    </Button>
+                  </Link>
+                </>
               ) : (
                 <>
                   <Link to="/register">
@@ -69,6 +94,54 @@ export function HomePage() {
                 </>
               )}
             </div>
+            {isAuthenticated && (
+              <div className="mt-8 flex flex-col items-center gap-3">
+                {showCodeInput ? (
+                  <form
+                    onSubmit={handleJoinByCode}
+                    className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full max-w-md"
+                  >
+                    <input
+                      type="text"
+                      autoFocus
+                      value={codeValue}
+                      onChange={(e) => setCodeValue(e.target.value)}
+                      placeholder="Paste your join code"
+                      className="flex-1 rounded-lg px-4 py-2.5 text-sm text-gray-900 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-white/70"
+                    />
+                    <Button
+                      type="submit"
+                      size="md"
+                      className="bg-white text-indigo-600 hover:bg-gray-100"
+                      disabled={codeValue.trim() === ''}
+                    >
+                      Join
+                    </Button>
+                    <Button
+                      type="button"
+                      size="md"
+                      variant="ghost"
+                      className="text-white hover:bg-white/10"
+                      onClick={() => {
+                        setShowCodeInput(false);
+                        setCodeValue('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowCodeInput(true)}
+                    className="inline-flex items-center gap-2 text-sm text-indigo-100 hover:text-white underline underline-offset-4"
+                  >
+                    <KeyRound className="w-4 h-4" />
+                    Have an invite code? Join by code
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-gray-50 to-transparent"></div>

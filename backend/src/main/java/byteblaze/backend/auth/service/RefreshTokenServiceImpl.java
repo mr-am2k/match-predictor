@@ -3,7 +3,7 @@ package byteblaze.backend.auth.service;
 import byteblaze.backend.auth.entity.RefreshToken;
 import byteblaze.backend.auth.entity.User;
 import byteblaze.backend.auth.repository.RefreshTokenRepository;
-import byteblaze.backend.exception.AuthException;
+import byteblaze.backend.auth.exception.AuthException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
