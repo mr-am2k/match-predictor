@@ -14,6 +14,7 @@ interface MatchPredictionCardProps {
 
 const FINAL_STATUSES = new Set(['FT', 'AET', 'PEN']);
 const HOUR_MS = 60 * 60 * 1000;
+const TWO_HOUR_MS = 2 * HOUR_MS;
 
 function formatKickoff(iso: string): string {
   const date = new Date(iso);
@@ -36,78 +37,55 @@ function formatPicks(
   return picks
     .map((pick) => {
       const name = nameById.get(pick.playerId) ?? `Player #${pick.playerId}`;
-      return pick.count > 1 ? `${name} (${pick.count})` : name;
+      return pick.count > 1 ? `${name} ×${pick.count}` : name;
     })
     .join(', ');
 }
 
-function summarisePrediction(
-  fixture: FixtureWithPrediction,
-  nameById: Map<number, string>
-): string {
-  const prediction = fixture.userPrediction;
-  if (!prediction) {
-    return 'No prediction yet';
-  }
+type OutcomeTone = 'home' | 'away' | 'draw' | 'none';
 
-  const headParts: string[] = [];
-  if (prediction.predictedDraw) {
-    headParts.push('Draw');
-  } else if (prediction.winnerTeamId === fixture.homeTeam.id) {
-    headParts.push(`${fixture.homeTeam.name} win`);
-  } else if (prediction.winnerTeamId === fixture.awayTeam.id) {
-    headParts.push(`${fixture.awayTeam.name} win`);
-  }
-
-  if (prediction.homeScore !== null && prediction.awayScore !== null) {
-    headParts.push(`${prediction.homeScore}-${prediction.awayScore}`);
-  }
-
-  const segments: string[] = [];
-  if (headParts.length > 0) {
-    segments.push(headParts.join(', '));
-  }
-
-  if (prediction.scorers.length > 0) {
-    segments.push(`Scorers: ${formatPicks(prediction.scorers, nameById)}`);
-  }
-  if (prediction.assisters.length > 0) {
-    segments.push(`Assisters: ${formatPicks(prediction.assisters, nameById)}`);
-  }
-
-  if (segments.length === 0) {
-    return 'No prediction yet';
-  }
-  return `You: ${segments.join(' · ')}`;
+function predictionOutcome(fixture: FixtureWithPrediction): OutcomeTone {
+  const p = fixture.userPrediction;
+  if (!p) return 'none';
+  if (p.predictedDraw) return 'draw';
+  if (p.winnerTeamId === fixture.homeTeam.id) return 'home';
+  if (p.winnerTeamId === fixture.awayTeam.id) return 'away';
+  return 'none';
 }
 
-function TeamBadge({
-  name,
-  logoUrl,
-  align,
-}: {
-  name: string;
-  logoUrl: string | null;
-  align: 'left' | 'right';
-}) {
+function outcomeChip(outcome: OutcomeTone, fixture: FixtureWithPrediction) {
+  switch (outcome) {
+    case 'home':
+      return {
+        label: `${fixture.homeTeam.name.toUpperCase()} WIN`,
+        className: 'chip chip-win',
+      };
+    case 'away':
+      return {
+        label: `${fixture.awayTeam.name.toUpperCase()} WIN`,
+        className: 'chip chip-win',
+      };
+    case 'draw':
+      return { label: 'Draw', className: 'chip chip-draw' };
+    default:
+      return null;
+  }
+}
+
+function TeamCrest({ name, logoUrl }: { name: string; logoUrl: string | null }) {
   return (
-    <div
-      className={`flex-1 min-w-0 flex items-center gap-2 ${align === 'right' ? 'justify-end flex-row-reverse' : ''}`}
-    >
-      <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center flex-shrink-0 overflow-hidden">
-        {logoUrl ? (
-          <img src={logoUrl} alt="" className="w-8 h-8 object-contain" />
-        ) : (
-          <span className="text-xs font-bold text-gray-500">
-            {name.charAt(0).toUpperCase()}
-          </span>
-        )}
-      </div>
-      <span
-        className={`font-semibold text-gray-900 truncate ${align === 'right' ? 'text-right' : 'text-left'}`}
-      >
-        {name}
-      </span>
+    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-900)] flex items-center justify-center flex-shrink-0 overflow-hidden">
+      {logoUrl ? (
+        <img
+          src={logoUrl}
+          alt=""
+          className="w-9 h-9 sm:w-10 sm:h-10 object-contain"
+        />
+      ) : (
+        <span className="font-display text-xl text-[color:var(--color-ink-200)] leading-none">
+          {name.charAt(0).toUpperCase()}
+        </span>
+      )}
     </div>
   );
 }
@@ -129,73 +107,206 @@ export function MatchPredictionCard({
     }
     return map;
   }, [fixture.homeSquad, fixture.awaySquad]);
-  const summary = summarisePrediction(fixture, nameById);
+
   const hasPrediction = fixture.userPrediction !== null;
   const locked = fixture.locked;
 
-  // Show the per-fixture countdown only in the final hour before kickoff to avoid clutter.
+  // Show per-fixture countdown only in the final hour before kickoff.
   const kickoffMs = new Date(fixture.kickoffAt).getTime();
   const nowMs = Date.now();
+  const timeUntilKickoff = kickoffMs - nowMs;
+  const kickoffSoon =
+    !Number.isNaN(kickoffMs) &&
+    timeUntilKickoff > 0 &&
+    timeUntilKickoff <= TWO_HOUR_MS;
   const withinCountdownWindow =
     !locked &&
     !isFinal &&
     !Number.isNaN(kickoffMs) &&
-    kickoffMs - nowMs <= HOUR_MS;
+    timeUntilKickoff <= HOUR_MS;
+
+  const outcome = predictionOutcome(fixture);
+  const chip = outcomeChip(outcome, fixture);
+
+  const p = fixture.userPrediction;
+  const predHome = p?.homeScore;
+  const predAway = p?.awayScore;
+  const hasScore = p != null && predHome != null && predAway != null;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <span className="text-xs font-medium text-gray-500">
+    <article
+      className={`
+        relative rounded-2xl border bg-[color:var(--color-ink-850)]/85 backdrop-blur-[6px]
+        transition-[border-color,transform,box-shadow] duration-300 ease-out
+        ${
+          locked
+            ? 'border-[color:var(--color-ink-700)] opacity-95'
+            : isFinal
+              ? 'border-[color:var(--color-ink-700)]'
+              : 'border-[color:var(--color-ink-700)] hover:border-[color:var(--color-ink-500)] hover:-translate-y-0.5'
+        }
+      `}
+    >
+      {/* Top meta row */}
+      <div className="flex items-center justify-between gap-3 px-4 sm:px-6 pt-4 pb-3">
+        <span
+          className={`font-mono text-[0.62rem] sm:text-[0.65rem] tracking-[0.18em] uppercase tabular-nums ${
+            kickoffSoon
+              ? 'text-[color:var(--color-volt-200)]'
+              : 'text-[color:var(--color-ink-300)]'
+          }`}
+        >
           {formatKickoff(fixture.kickoffAt)}
         </span>
         {isFinal ? (
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-            Final
-          </span>
+          <span className="chip">Final</span>
         ) : locked ? (
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-red-600 bg-red-50 px-2 py-0.5 rounded">
-            Locked
-          </span>
+          <LockCountdown locksAt={fixture.lockedAt} />
         ) : withinCountdownWindow ? (
-          <LockCountdown
-            locksAt={fixture.lockedAt}
-            className="text-[10px] font-semibold uppercase tracking-wider"
-          />
+          <LockCountdown locksAt={fixture.lockedAt} />
         ) : (
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+          <span className="font-mono text-[0.6rem] tracking-[0.2em] uppercase text-[color:var(--color-ink-400)]">
             {fixture.status}
           </span>
         )}
       </div>
 
-      <div className="flex items-center gap-3">
-        <TeamBadge
-          name={fixture.homeTeam.name}
-          logoUrl={fixture.homeTeam.logoUrl}
-          align="left"
-        />
-        <div className="flex-shrink-0 text-center min-w-[60px]">
-          {showActualScore ? (
-            <div className="text-2xl font-bold text-gray-900">
-              {fixture.homeScore}-{fixture.awayScore}
+      <div className="tick-divider mx-4 sm:mx-6" />
+
+      {/* Scorecard */}
+      <div className="px-4 sm:px-6 py-5">
+        {/* Mobile: stacked. Desktop: home | score | away */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-5">
+          {/* HOME */}
+          <div className="flex items-center gap-3 min-w-0">
+            <TeamCrest
+              name={fixture.homeTeam.name}
+              logoUrl={fixture.homeTeam.logoUrl}
+            />
+            <div className="min-w-0">
+              <p className="font-mono text-[0.55rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-400)] mb-1">
+                Home
+              </p>
+              <h3 className="font-display text-lg sm:text-2xl tracking-wide text-[color:var(--color-ink-50)] truncate leading-none">
+                {fixture.homeTeam.name}
+              </h3>
             </div>
-          ) : (
-            <div className="text-gray-400 font-medium text-sm">vs</div>
-          )}
+          </div>
+
+          {/* SCORE CENTRE */}
+          <div className="flex flex-col items-center gap-1 px-2 sm:px-4">
+            {showActualScore ? (
+              <>
+                <span className="font-mono text-[0.55rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-400)]">
+                  Final
+                </span>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="scoreboard text-3xl sm:text-5xl text-[color:var(--color-ink-50)] tabular-nums">
+                    {fixture.homeScore}
+                  </span>
+                  <span className="font-mono text-sm text-[color:var(--color-ink-500)]">
+                    –
+                  </span>
+                  <span className="scoreboard text-3xl sm:text-5xl text-[color:var(--color-ink-50)] tabular-nums">
+                    {fixture.awayScore}
+                  </span>
+                </div>
+              </>
+            ) : hasScore ? (
+              <>
+                <span className="font-mono text-[0.55rem] tracking-[0.22em] uppercase text-[color:var(--color-volt-200)]">
+                  Your call
+                </span>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="scoreboard text-3xl sm:text-5xl text-[color:var(--color-ink-50)] tabular-nums">
+                    {predHome}
+                  </span>
+                  <span className="font-mono text-sm text-[color:var(--color-ink-500)]">
+                    –
+                  </span>
+                  <span className="scoreboard text-3xl sm:text-5xl text-[color:var(--color-ink-50)] tabular-nums">
+                    {predAway}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="font-mono text-[0.55rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-500)]">
+                  Match
+                </span>
+                <span className="font-display text-3xl sm:text-4xl tracking-[0.08em] text-[color:var(--color-ink-500)] leading-none">
+                  VS
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* AWAY */}
+          <div className="flex items-center gap-3 justify-end flex-row-reverse min-w-0">
+            <TeamCrest
+              name={fixture.awayTeam.name}
+              logoUrl={fixture.awayTeam.logoUrl}
+            />
+            <div className="min-w-0 text-right">
+              <p className="font-mono text-[0.55rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-400)] mb-1">
+                Away
+              </p>
+              <h3 className="font-display text-lg sm:text-2xl tracking-wide text-[color:var(--color-ink-50)] truncate leading-none">
+                {fixture.awayTeam.name}
+              </h3>
+            </div>
+          </div>
         </div>
-        <TeamBadge
-          name={fixture.awayTeam.name}
-          logoUrl={fixture.awayTeam.logoUrl}
-          align="right"
-        />
+
+        {/* Extra pick detail (scorers / assisters) */}
+        {hasPrediction &&
+          p &&
+          (p.scorers.length > 0 || p.assisters.length > 0) && (
+            <div className="mt-5 pt-4 border-t border-dashed border-[color:var(--color-ink-700)] space-y-1.5">
+              {p.scorers.length > 0 && (
+                <p className="text-xs text-[color:var(--color-ink-200)] leading-relaxed">
+                  <span className="font-mono text-[0.58rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-400)] mr-2">
+                    Scorers
+                  </span>
+                  <span className="text-[color:var(--color-ink-100)]">
+                    {formatPicks(p.scorers, nameById)}
+                  </span>
+                </p>
+              )}
+              {p.assisters.length > 0 && (
+                <p className="text-xs text-[color:var(--color-ink-200)] leading-relaxed">
+                  <span className="font-mono text-[0.58rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-400)] mr-2">
+                    Assisters
+                  </span>
+                  <span className="text-[color:var(--color-ink-100)]">
+                    {formatPicks(p.assisters, nameById)}
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
       </div>
 
-      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
-        <p
-          className={`text-sm flex-1 min-w-0 line-clamp-2 ${hasPrediction ? 'text-gray-700' : 'text-gray-400 italic'}`}
-        >
-          {summary}
-        </p>
+      <div className="tick-divider mx-4 sm:mx-6" />
+
+      {/* Footer */}
+      <div className="px-4 sm:px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          {chip ? (
+            <span className={chip.className}>{chip.label}</span>
+          ) : (
+            <span className="font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-400)] italic">
+              No prediction yet
+            </span>
+          )}
+          {hasPrediction && hasScore && (
+            <span className="chip">
+              <span className="font-mono tabular-nums text-[color:var(--color-ink-50)]">
+                {predHome}–{predAway}
+              </span>
+            </span>
+          )}
+        </div>
         {!isFinal && (
           <Button
             size="sm"
@@ -208,6 +319,6 @@ export function MatchPredictionCard({
           </Button>
         )}
       </div>
-    </div>
+    </article>
   );
 }

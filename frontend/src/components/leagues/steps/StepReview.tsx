@@ -1,3 +1,4 @@
+import { Globe, Lock } from 'lucide-react';
 import type { Competition } from '../../../types/competition';
 import type { LeagueVisibility } from '../../../types/league';
 
@@ -9,44 +10,82 @@ interface StepReviewProps {
 
 export function StepReview({ name, visibility, competition }: StepReviewProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fade-up">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Review & create</h2>
-        <p className="text-gray-600 mt-1">Make sure everything looks right before creating your league.</p>
+        <p className="font-mono text-[0.68rem] tracking-[0.3em] uppercase text-[color:var(--color-volt-200)] mb-3">
+          / Step 05 — Final whistle
+        </p>
+        <h2 className="font-display text-4xl sm:text-5xl tracking-wide text-[color:var(--color-ink-50)]">
+          Review & launch.
+        </h2>
+        <p className="mt-3 text-[color:var(--color-ink-200)] max-w-xl">
+          Last look before the league goes live. Members will see exactly what you've set up.
+        </p>
       </div>
 
-      <div className="border border-gray-200 rounded-xl divide-y divide-gray-200">
-        <div className="p-4 flex justify-between items-start gap-4">
-          <div>
-            <div className="text-sm text-gray-500">Name</div>
-            <div className="font-semibold text-gray-900 mt-0.5 break-all">{name}</div>
+      <div className="rounded-2xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/70 overflow-hidden">
+        <div className="relative p-6 sm:p-8 border-b border-[color:var(--color-ink-700)] overflow-hidden">
+          <div aria-hidden className="absolute inset-0 stadium-mesh opacity-40 pointer-events-none" />
+          <div className="relative">
+            <p className="font-mono text-[0.6rem] tracking-[0.3em] uppercase text-[color:var(--color-ink-300)] mb-3">
+              League name
+            </p>
+            <h3 className="font-display text-4xl sm:text-5xl tracking-wide text-[color:var(--color-ink-50)] leading-[0.9] break-words">
+              {name}
+            </h3>
           </div>
         </div>
 
-        <div className="p-4 flex justify-between items-start gap-4">
-          <div>
-            <div className="text-sm text-gray-500">Visibility</div>
-            <div className="font-semibold text-gray-900 mt-0.5">
-              {visibility === 'PRIVATE' ? 'Private (invite-only)' : 'Public'}
+        <div className="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[color:var(--color-ink-700)]">
+          <div className="p-6">
+            <p className="font-mono text-[0.6rem] tracking-[0.3em] uppercase text-[color:var(--color-ink-300)] mb-3">
+              Visibility
+            </p>
+            <div className="flex items-center gap-2.5">
+              <div
+                className={`w-9 h-9 rounded-lg grid place-items-center ${
+                  visibility === 'PRIVATE'
+                    ? 'bg-[color:var(--color-ink-800)] border border-[color:var(--color-ink-700)] text-[color:var(--color-ink-100)]'
+                    : 'bg-[color:var(--color-volt-200)]/10 border border-[color:var(--color-volt-200)]/30 text-[color:var(--color-volt-200)]'
+                }`}
+              >
+                {visibility === 'PRIVATE' ? <Lock className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+              </div>
+              <div>
+                <p className="font-display text-xl tracking-wide uppercase text-[color:var(--color-ink-50)]">
+                  {visibility === 'PRIVATE' ? 'Private' : 'Public'}
+                </p>
+                <p className="text-xs text-[color:var(--color-ink-300)]">
+                  {visibility === 'PRIVATE' ? 'Invite-only join link' : 'Discoverable in browse feed'}
+                </p>
+              </div>
             </div>
             {visibility === 'PRIVATE' && (
-              <div className="text-xs text-gray-500 mt-1">
+              <p className="mt-3 text-xs text-[color:var(--color-ink-400)] leading-relaxed">
                 We'll generate a join link you can share with friends after you create the league.
-              </div>
+              </p>
             )}
           </div>
-        </div>
 
-        <div className="p-4 flex justify-between items-start gap-4">
-          <div className="min-w-0">
-            <div className="text-sm text-gray-500">Competition</div>
-            <div className="flex items-center gap-3 mt-1">
+          <div className="p-6">
+            <p className="font-mono text-[0.6rem] tracking-[0.3em] uppercase text-[color:var(--color-ink-300)] mb-3">
+              Competition
+            </p>
+            <div className="flex items-center gap-3">
               {competition.logoUrl && (
-                <img src={competition.logoUrl} alt="" className="w-8 h-8 object-contain" />
+                <img
+                  src={competition.logoUrl}
+                  alt=""
+                  className="w-10 h-10 object-contain flex-shrink-0"
+                />
               )}
               <div className="min-w-0">
-                <div className="font-semibold text-gray-900 truncate">{competition.name}</div>
-                <div className="text-sm text-gray-600">Season {competition.seasonYear}</div>
+                <p className="font-display text-xl tracking-wide uppercase text-[color:var(--color-ink-50)] truncate">
+                  {competition.name}
+                </p>
+                <p className="font-mono text-xs tabular-nums text-[color:var(--color-volt-200)] mt-0.5">
+                  Season {competition.seasonYear}
+                </p>
               </div>
             </div>
           </div>

@@ -4,47 +4,66 @@ import { forwardRef, useId } from 'react';
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  hint?: string;
   icon?: ReactNode;
+  rightSlot?: ReactNode;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, icon, className = '', id, ...props }, ref) => {
+  ({ label, error, hint, icon, rightSlot, className = '', id, ...props }, ref) => {
     const generatedId = useId();
     const inputId = id ?? generatedId;
+
     return (
       <div className="w-full">
         {label && (
-          <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            htmlFor={inputId}
+            className="block text-[0.65rem] font-semibold tracking-[0.18em] uppercase text-[color:var(--color-ink-300)] mb-2"
+          >
             {label}
           </label>
         )}
-        <div className="relative">
+        <div
+          className={`
+            group relative flex items-center
+            rounded-lg border transition-colors duration-150
+            ${error
+              ? 'border-[color:var(--color-loss-500)]/60 bg-[color:var(--color-loss-500)]/5'
+              : 'border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-800)]/70 focus-within:border-[color:var(--color-volt-200)]/70 focus-within:bg-[color:var(--color-ink-800)]'}
+          `}
+        >
           {icon && (
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-              {icon}
+            <div className="pl-3.5 flex items-center pointer-events-none text-[color:var(--color-ink-300)] group-focus-within:text-[color:var(--color-volt-200)] transition-colors">
+              <span className="[&_svg]:w-4 [&_svg]:h-4">{icon}</span>
             </div>
           )}
           <input
             ref={ref}
             id={inputId}
             className={`
-              block w-full rounded-lg border transition-all duration-200
-              ${icon ? 'pl-10' : 'pl-4'} pr-4 py-2.5
-              ${error
-                ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'
-              }
-              focus:outline-none focus:ring-2 focus:ring-opacity-50
-              placeholder:text-gray-400
-              disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
+              block w-full bg-transparent
+              ${icon ? 'pl-2.5' : 'pl-4'} ${rightSlot ? 'pr-2' : 'pr-4'} py-2.5
+              text-sm text-[color:var(--color-ink-50)]
+              placeholder:text-[color:var(--color-ink-400)]
+              disabled:opacity-50 disabled:cursor-not-allowed
+              outline-none
               ${className}
             `}
             {...props}
           />
+          {rightSlot && (
+            <div className="pr-2 flex items-center">{rightSlot}</div>
+          )}
         </div>
-        {error && (
-          <p className="mt-1 text-sm text-red-600">{error}</p>
-        )}
+        {error ? (
+          <p className="mt-1.5 text-xs text-[color:var(--color-loss-500)] flex items-center gap-1.5">
+            <span className="inline-block w-1 h-1 rounded-full bg-[color:var(--color-loss-500)]" />
+            {error}
+          </p>
+        ) : hint ? (
+          <p className="mt-1.5 text-xs text-[color:var(--color-ink-300)]">{hint}</p>
+        ) : null}
       </div>
     );
   }

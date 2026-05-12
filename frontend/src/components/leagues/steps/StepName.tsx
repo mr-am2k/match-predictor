@@ -8,23 +8,38 @@ interface StepNameProps {
 
 export function StepName({ name, onChange, error }: StepNameProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 animate-fade-up">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Name your league</h2>
-        <p className="text-gray-600 mt-1">
-          Give your league a memorable name. You can't change it later.
+        <p className="font-mono text-[0.68rem] tracking-[0.3em] uppercase text-[color:var(--color-volt-200)] mb-3">
+          / Step 01 — Identity
+        </p>
+        <h2 className="font-display text-4xl sm:text-5xl tracking-wide text-[color:var(--color-ink-50)]">
+          Name your league.
+        </h2>
+        <p className="mt-3 text-[color:var(--color-ink-200)] max-w-xl">
+          Give this contest a banner. It has to live on the scoreboard all season — make it count.
         </p>
       </div>
-      <Input
-        label="League name"
-        value={name}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="e.g. Friends World Cup Pool"
-        maxLength={100}
-        error={error}
-        autoFocus
-      />
-      <div className="text-xs text-gray-500 flex justify-end">{name.length}/100</div>
+
+      <div className="rounded-2xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/60 p-5 sm:p-6">
+        <Input
+          label="League name"
+          value={name}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="e.g. Friday Night Punditry"
+          maxLength={100}
+          error={error}
+          autoFocus
+        />
+        <div className="mt-3 flex items-center justify-between">
+          <p className="text-xs text-[color:var(--color-ink-300)]">
+            Minimum 3 characters. Cannot be edited later.
+          </p>
+          <p className="font-mono tabular-nums text-xs text-[color:var(--color-ink-400)]">
+            {name.length}/100
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

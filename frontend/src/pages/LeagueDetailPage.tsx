@@ -27,6 +27,12 @@ import type { League } from '../types/league';
 
 type TabKey = 'overview' | 'season-picks' | 'standings';
 
+const TABS: Array<{ key: TabKey; label: string; icon: typeof Trophy }> = [
+  { key: 'overview', label: 'Overview', icon: ListChecks },
+  { key: 'season-picks', label: 'Season picks', icon: Star },
+  { key: 'standings', label: 'Standings', icon: Trophy },
+];
+
 export function LeagueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
@@ -80,27 +86,25 @@ export function LeagueDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      <div className="min-h-[calc(100vh-72px)] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[color:var(--color-volt-200)] animate-spin" />
       </div>
     );
   }
 
   if (error || !league) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-8">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+      <div className="min-h-[calc(100vh-72px)]">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-10 py-14 space-y-4">
+          <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8 text-[color:var(--color-loss-500)] text-sm">
+            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
             <span>{error ?? 'League not found'}</span>
           </div>
-          <div className="mt-4">
-            <Link to="/dashboard">
-              <Button variant="outline" icon={<ArrowLeft className="w-4 h-4" />}>
-                Back to dashboard
-              </Button>
-            </Link>
-          </div>
+          <Link to="/dashboard">
+            <Button variant="outline" icon={<ArrowLeft />}>
+              Back to dashboard
+            </Button>
+          </Link>
         </div>
       </div>
     );
@@ -110,165 +114,171 @@ export function LeagueDetailPage() {
   const joinUrl = league.joinCode ? buildJoinUrl(league.joinCode) : null;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-8">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <div className="min-h-[calc(100vh-72px)]">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-10 sm:py-14 space-y-8">
         <Link
           to="/dashboard"
-          className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+          className="inline-flex items-center gap-2 font-mono text-[0.68rem] tracking-[0.24em] uppercase text-[color:var(--color-ink-300)] hover:text-[color:var(--color-volt-200)] transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to dashboard
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to dashboard
         </Link>
 
         {justCreated && (
-          <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-            <Check className="w-4 h-4 flex-shrink-0" />
-            <span>League created successfully.</span>
+          <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-win-500)]/40 bg-[color:var(--color-win-500)]/8 text-[color:var(--color-win-500)] text-sm animate-fade-up">
+            <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <span>League created successfully. Invite the rivals.</span>
           </div>
         )}
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h1 className="text-2xl font-bold text-gray-900 break-words">{league.name}</h1>
-                <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
-                  {league.visibility === 'PRIVATE' ? (
-                    <>
-                      <Lock className="w-4 h-4" /> Private league
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="w-4 h-4" /> Public league
-                    </>
+        {/* Hero */}
+        <section className="relative overflow-hidden rounded-2xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/80 backdrop-blur-[6px] animate-fade-up">
+          <div aria-hidden className="absolute inset-0 stadium-mesh opacity-50 [mask-image:radial-gradient(ellipse_at_top_right,black_10%,transparent_70%)]" />
+          <div aria-hidden className="absolute -top-24 -right-16 w-72 h-72 rounded-full bg-[color:var(--color-volt-200)]/12 blur-3xl" />
+          <div className="relative p-6 sm:p-10">
+            <div className="flex items-center gap-3 mb-5 flex-wrap">
+              <span className={`chip ${league.visibility === 'PRIVATE' ? '' : 'chip-win'}`}>
+                {league.visibility === 'PRIVATE' ? (
+                  <>
+                    <Lock className="w-3 h-3" /> Private
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-3 h-3" /> Public
+                  </>
+                )}
+              </span>
+              {isOwner && <span className="chip chip-volt">Owner</span>}
+              <span className="font-mono text-[0.62rem] tracking-[0.24em] uppercase text-[color:var(--color-ink-400)] inline-flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" />
+                <span className="tabular-nums text-[color:var(--color-ink-200)]">{league.memberCount}</span>
+                {league.memberCount === 1 ? 'member' : 'members'}
+              </span>
+            </div>
+
+            <div className="grid lg:grid-cols-12 gap-6 items-end">
+              <div className="lg:col-span-8">
+                <p className="font-mono text-[0.68rem] tracking-[0.28em] uppercase text-[color:var(--color-volt-200)] mb-3">
+                  / League
+                </p>
+                <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl tracking-wide text-[color:var(--color-ink-50)] leading-[0.9] break-words">
+                  {league.name}
+                </h1>
+                <div className="mt-6 flex items-center gap-3 flex-wrap">
+                  {league.competition.logoUrl && (
+                    <img
+                      src={league.competition.logoUrl}
+                      alt=""
+                      className="w-10 h-10 object-contain"
+                    />
                   )}
+                  <div>
+                    <div className="font-display text-lg tracking-wide uppercase text-[color:var(--color-ink-50)]">
+                      {league.competition.name}
+                    </div>
+                    <div className="font-mono text-[0.65rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-300)] mt-0.5">
+                      Season {league.competition.seasonYear}
+                      {league.competition.countryName ? ` · ${league.competition.countryName}` : ''}
+                    </div>
+                  </div>
                 </div>
+                <p className="mt-5 text-sm text-[color:var(--color-ink-200)]">
+                  Owned by{' '}
+                  <span className="font-semibold text-[color:var(--color-ink-50)]">
+                    {league.owner.username}
+                  </span>
+                </p>
               </div>
-              <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                <Users className="w-4 h-4" />
-                <span>
-                  {league.memberCount} {league.memberCount === 1 ? 'member' : 'members'}
-                </span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3">
-              {league.competition.logoUrl && (
-                <img src={league.competition.logoUrl} alt="" className="w-10 h-10 object-contain" />
-              )}
-              <div>
-                <div className="font-semibold text-gray-900">{league.competition.name}</div>
-                <div className="text-sm text-gray-600">
-                  Season {league.competition.seasonYear}
-                  {league.competition.countryName ? ` · ${league.competition.countryName}` : ''}
-                </div>
+              <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col gap-3">
+                <Button
+                  onClick={() => navigate(`/leagues/${league.id}/predictions`)}
+                  icon={<ListChecks />}
+                  iconPosition="right"
+                  size="lg"
+                  className="w-full justify-between"
+                >
+                  View predictions
+                </Button>
               </div>
             </div>
-            <div className="text-sm text-gray-600">
-              Owned by <span className="font-medium text-gray-900">{league.owner.username}</span>
-            </div>
-            <div className="pt-2">
-              <Button
-                onClick={() => navigate(`/leagues/${league.id}/predictions`)}
-                icon={<ListChecks className="w-4 h-4" />}
-              >
-                View predictions
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex gap-6" aria-label="Tabs">
-            <button
-              type="button"
-              onClick={() => setActiveTab('overview')}
-              className={`py-3 px-1 border-b-2 text-sm font-medium transition-colors ${
-                activeTab === 'overview'
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
-              Overview
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('season-picks')}
-              className={`py-3 px-1 border-b-2 text-sm font-medium transition-colors inline-flex items-center gap-1.5 ${
-                activeTab === 'season-picks'
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
-              <Star className="w-4 h-4" />
-              Season picks
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('standings')}
-              className={`py-3 px-1 border-b-2 text-sm font-medium transition-colors inline-flex items-center gap-1.5 ${
-                activeTab === 'standings'
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
-              <Trophy className="w-4 h-4" />
-              Standings
-            </button>
+        <div className="border-b border-[color:var(--color-ink-700)] -mx-4 sm:-mx-6 lg:-mx-10 px-4 sm:px-6 lg:px-10 overflow-x-auto">
+          <nav className="flex gap-1 sm:gap-2 min-w-max" aria-label="Tabs">
+            {TABS.map(({ key, label, icon: Icon }) => {
+              const isActive = activeTab === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveTab(key)}
+                  className={`relative inline-flex items-center gap-2 py-3 px-4 font-mono text-[0.7rem] tracking-[0.22em] uppercase transition-colors ${
+                    isActive
+                      ? 'text-[color:var(--color-volt-200)]'
+                      : 'text-[color:var(--color-ink-300)] hover:text-[color:var(--color-ink-50)]'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                  <span
+                    className={`absolute left-0 right-0 -bottom-px h-[2px] transition-all ${
+                      isActive ? 'bg-[color:var(--color-volt-200)]' : 'bg-transparent'
+                    }`}
+                  />
+                </button>
+              );
+            })}
           </nav>
         </div>
 
         {activeTab === 'overview' && (
-          <>
+          <div className="space-y-6 animate-fade-in">
             {isOwner && league.visibility === 'PRIVATE' && league.joinCode && joinUrl && (
               <Card>
                 <CardHeader>
-                  <h2 className="text-lg font-semibold text-gray-900">Invite friends</h2>
-                  <p className="text-sm text-gray-600 mt-0.5">
+                  <p className="font-mono text-[0.62rem] tracking-[0.25em] uppercase text-[color:var(--color-volt-200)] mb-2">
+                    / Invite
+                  </p>
+                  <h2 className="font-display text-2xl sm:text-3xl tracking-wide uppercase text-[color:var(--color-ink-50)]">
+                    Invite the rivals
+                  </h2>
+                  <p className="text-sm text-[color:var(--color-ink-200)] mt-1">
                     Share this link or code with the people you want to invite. Only league owners can see it.
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <div className="text-xs font-medium text-gray-500 mb-1">Join link</div>
+                    <p className="font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-300)] mb-2">
+                      Join link
+                    </p>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-800 break-all">
+                      <code className="flex-1 p-2.5 rounded-lg border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-800)]/70 font-mono text-xs text-[color:var(--color-ink-100)] break-all">
                         {joinUrl}
                       </code>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleCopy(joinUrl, 'url')}
-                        icon={
-                          copiedTarget === 'url' ? (
-                            <Check className="w-4 h-4" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )
-                        }
+                        icon={copiedTarget === 'url' ? <Check /> : <Copy />}
                       >
                         {copiedTarget === 'url' ? 'Copied' : 'Copy'}
                       </Button>
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs font-medium text-gray-500 mb-1">Join code</div>
+                    <p className="font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-300)] mb-2">
+                      Join code
+                    </p>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-lg font-mono font-semibold text-gray-900 tracking-wider">
+                      <code className="flex-1 p-3 rounded-lg border border-[color:var(--color-volt-200)]/30 bg-[color:var(--color-volt-200)]/5 font-mono text-lg font-bold text-[color:var(--color-volt-200)] tracking-[0.3em] text-center">
                         {league.joinCode}
                       </code>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleCopy(league.joinCode!, 'code')}
-                        icon={
-                          copiedTarget === 'code' ? (
-                            <Check className="w-4 h-4" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )
-                        }
+                        icon={copiedTarget === 'code' ? <Check /> : <Copy />}
                       >
                         {copiedTarget === 'code' ? 'Copied' : 'Copy'}
                       </Button>
@@ -286,16 +296,24 @@ export function LeagueDetailPage() {
                   className="w-full flex items-center justify-between gap-3 text-left"
                 >
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900">Members</h2>
-                    <p className="text-sm text-gray-600 mt-0.5">
-                      {league.memberCount} {league.memberCount === 1 ? 'member' : 'members'} in this league
+                    <p className="font-mono text-[0.62rem] tracking-[0.25em] uppercase text-[color:var(--color-volt-200)] mb-2">
+                      / Roster
+                    </p>
+                    <h2 className="font-display text-2xl sm:text-3xl tracking-wide uppercase text-[color:var(--color-ink-50)]">
+                      Members
+                    </h2>
+                    <p className="text-sm text-[color:var(--color-ink-200)] mt-1">
+                      <span className="font-mono tabular-nums text-[color:var(--color-ink-100)]">{league.memberCount}</span>{' '}
+                      {league.memberCount === 1 ? 'manager' : 'managers'} in this league
                     </p>
                   </div>
-                  {membersExpanded ? (
-                    <ChevronUp className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
-                  )}
+                  <span className="w-9 h-9 rounded-lg border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-800)]/60 grid place-items-center text-[color:var(--color-ink-300)] flex-shrink-0">
+                    {membersExpanded ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                  </span>
                 </button>
               </CardHeader>
               {membersExpanded && (
@@ -306,25 +324,34 @@ export function LeagueDetailPage() {
             </Card>
 
             <ScoringRulesCard league={league} />
-          </>
+          </div>
         )}
 
         {activeTab === 'season-picks' && (
-          <SeasonPicksPanel leagueId={league.id} />
+          <div className="animate-fade-in">
+            <SeasonPicksPanel leagueId={league.id} />
+          </div>
         )}
 
         {activeTab === 'standings' && (
-          <Card>
-            <CardHeader>
-              <h2 className="text-lg font-semibold text-gray-900">Standings</h2>
-              <p className="text-sm text-gray-600 mt-0.5">
-                Total points across settled gameweeks.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <StandingsTable leagueId={league.id} />
-            </CardContent>
-          </Card>
+          <div className="animate-fade-in">
+            <Card>
+              <CardHeader>
+                <p className="font-mono text-[0.62rem] tracking-[0.25em] uppercase text-[color:var(--color-volt-200)] mb-2">
+                  / Leaderboard
+                </p>
+                <h2 className="font-display text-2xl sm:text-3xl tracking-wide uppercase text-[color:var(--color-ink-50)]">
+                  Standings
+                </h2>
+                <p className="text-sm text-[color:var(--color-ink-200)] mt-1">
+                  Total points across settled gameweeks.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <StandingsTable leagueId={league.id} />
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listCompetitions } from '../../api/competitions';
@@ -12,7 +12,6 @@ import {
   validateScoringRules,
 } from '../../types/scoring';
 import { Button } from '../ui/Button';
-import { Card, CardContent } from '../ui/Card';
 import { StepCompetition } from './steps/StepCompetition';
 import { StepName } from './steps/StepName';
 import { StepReview } from './steps/StepReview';
@@ -140,10 +139,12 @@ export function LeagueCreationWizard() {
   };
 
   return (
-    <Card>
-      <CardContent className="py-8 sm:px-8 space-y-8">
+    <div className="rounded-2xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/80 backdrop-blur-[6px] overflow-hidden">
+      <div className="px-5 sm:px-8 pt-6 pb-7 border-b border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-900)]/40">
         <WizardProgress currentIndex={stepIndex} />
+      </div>
 
+      <div className="px-5 sm:px-8 py-8 space-y-8">
         {currentStep === 'name' && (
           <StepName
             name={state.name}
@@ -186,39 +187,48 @@ export function LeagueCreationWizard() {
         )}
 
         {submitError && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8 text-[color:var(--color-loss-500)] text-sm"
+          >
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <span>{submitError}</span>
           </div>
         )}
+      </div>
 
-        <div className="flex items-center justify-between gap-3 pt-4 border-t border-gray-100">
+      <div className="flex items-center justify-between gap-3 px-5 sm:px-8 py-5 border-t border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-900)]/30">
+        <Button
+          variant="ghost"
+          onClick={handleBack}
+          disabled={stepIndex === 0 || isSubmitting}
+          icon={<ArrowLeft />}
+        >
+          Back
+        </Button>
+
+        {currentStep !== 'review' ? (
           <Button
-            variant="ghost"
-            onClick={handleBack}
-            disabled={stepIndex === 0 || isSubmitting}
-            icon={<ArrowLeft className="w-4 h-4" />}
+            onClick={handleNext}
+            disabled={!canAdvance}
+            icon={<ArrowRight />}
+            iconPosition="right"
           >
-            Back
+            Continue
           </Button>
-
-          {currentStep !== 'review' ? (
-            <Button onClick={handleNext} disabled={!canAdvance}>
-              Continue
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          ) : (
-            <Button
-              onClick={handleSubmit}
-              disabled={!canAdvance || isSubmitting}
-              icon={isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-            >
-              {isSubmitting ? 'Creating...' : 'Create league'}
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        ) : (
+          <Button
+            onClick={handleSubmit}
+            disabled={!canAdvance || isSubmitting}
+            isLoading={isSubmitting}
+            icon={<Check />}
+            iconPosition="right"
+          >
+            {isSubmitting ? 'Creating...' : 'Create league'}
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -228,42 +238,72 @@ interface WizardProgressProps {
 
 function WizardProgress({ currentIndex }: WizardProgressProps) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      {STEP_ORDER.map((step, idx) => {
-        const isCompleted = idx < currentIndex;
-        const isCurrent = idx === currentIndex;
-        return (
-          <div key={step} className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+    <div>
+      <div className="hidden sm:flex items-center gap-2">
+        {STEP_ORDER.map((step, idx) => {
+          const isCompleted = idx < currentIndex;
+          const isCurrent = idx === currentIndex;
+          return (
+            <div key={step} className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-mono text-[0.72rem] font-bold tabular-nums transition-colors ${
+                    isCompleted
+                      ? 'bg-[color:var(--color-volt-200)] text-[color:var(--color-ink-950)]'
+                      : isCurrent
+                        ? 'bg-[color:var(--color-ink-850)] text-[color:var(--color-volt-200)] border border-[color:var(--color-volt-200)]/60 shadow-[0_0_0_3px_rgba(215,255,61,0.08)]'
+                        : 'bg-[color:var(--color-ink-800)] text-[color:var(--color-ink-400)] border border-[color:var(--color-ink-700)]'
+                  }`}
+                >
+                  {isCompleted ? <Check className="w-4 h-4" strokeWidth={3} /> : String(idx + 1).padStart(2, '0')}
+                </div>
+                {idx < STEP_ORDER.length - 1 && (
+                  <div
+                    className={`flex-1 h-[2px] transition-colors ${
+                      isCompleted ? 'bg-[color:var(--color-volt-200)]' : 'bg-[color:var(--color-ink-700)]'
+                    }`}
+                  />
+                )}
+              </div>
               <div
-                className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${
-                  isCompleted
-                    ? 'bg-indigo-600 text-white'
-                    : isCurrent
-                      ? 'bg-indigo-100 text-indigo-700 border-2 border-indigo-600'
-                      : 'bg-gray-100 text-gray-500'
+                className={`mt-2.5 font-mono text-[0.62rem] tracking-[0.22em] uppercase truncate transition-colors ${
+                  isCurrent
+                    ? 'text-[color:var(--color-volt-200)]'
+                    : isCompleted
+                      ? 'text-[color:var(--color-ink-200)]'
+                      : 'text-[color:var(--color-ink-400)]'
                 }`}
               >
-                {isCompleted ? <Check className="w-4 h-4" /> : idx + 1}
+                {STEP_LABELS[step]}
               </div>
-              {idx < STEP_ORDER.length - 1 && (
-                <div
-                  className={`flex-1 h-0.5 ${
-                    isCompleted ? 'bg-indigo-600' : 'bg-gray-200'
-                  }`}
-                />
-              )}
             </div>
-            <div
-              className={`mt-2 text-xs font-medium truncate ${
-                isCurrent ? 'text-indigo-700' : 'text-gray-500'
+          );
+        })}
+      </div>
+      <div className="sm:hidden flex items-center justify-between">
+        <div>
+          <p className="font-mono text-[0.6rem] tracking-[0.28em] uppercase text-[color:var(--color-ink-300)]">
+            Step {String(currentIndex + 1).padStart(2, '0')} / {String(STEP_ORDER.length).padStart(2, '0')}
+          </p>
+          <p className="font-display text-xl tracking-wide uppercase text-[color:var(--color-ink-50)] mt-0.5">
+            {STEP_LABELS[STEP_ORDER[currentIndex]]}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {STEP_ORDER.map((step, idx) => (
+            <span
+              key={step}
+              className={`block h-1 rounded-full transition-all ${
+                idx === currentIndex
+                  ? 'w-6 bg-[color:var(--color-volt-200)]'
+                  : idx < currentIndex
+                    ? 'w-1.5 bg-[color:var(--color-volt-200)]/60'
+                    : 'w-1.5 bg-[color:var(--color-ink-700)]'
               }`}
-            >
-              {STEP_LABELS[step]}
-            </div>
-          </div>
-        );
-      })}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

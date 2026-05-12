@@ -137,24 +137,24 @@ export function EditScoringRulesPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      <div className="min-h-[calc(100vh-72px)] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[color:var(--color-volt-200)] animate-spin" />
       </div>
     );
   }
 
   if (loadError || !league || !rules || !draft) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-8">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
-          <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+      <div className="min-h-[calc(100vh-72px)]">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-10 py-14 space-y-4">
+          <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8 text-[color:var(--color-loss-500)] text-sm">
+            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
             <span>{loadError ?? 'Scoring rules not found'}</span>
           </div>
           <Button
             variant="outline"
             onClick={() => navigate(-1)}
-            icon={<ArrowLeft className="w-4 h-4" />}
+            icon={<ArrowLeft />}
           >
             Go back
           </Button>
@@ -167,56 +167,68 @@ export function EditScoringRulesPage() {
   const readOnly = !rules.editable || !isOwner;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-8">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <div className="min-h-[calc(100vh-72px)]">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-10 sm:py-14 space-y-8">
         <Link
           to={`/leagues/${league.id}`}
-          className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+          className="inline-flex items-center gap-2 font-mono text-[0.68rem] tracking-[0.24em] uppercase text-[color:var(--color-ink-300)] hover:text-[color:var(--color-volt-200)] transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to league
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to league
         </Link>
 
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Scoring rules</h1>
-          <p className="text-gray-600 mt-1">
-            {league.name}
+        <div className="animate-fade-up">
+          <p className="font-mono text-[0.7rem] tracking-[0.3em] uppercase text-[color:var(--color-volt-200)] mb-3">
+            / Scoring rules
+          </p>
+          <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl tracking-wide text-[color:var(--color-ink-50)] leading-[0.9]">
+            {readOnly ? 'Rules on file.' : 'Tune the engine.'}
+          </h1>
+          <p className="mt-4 text-[color:var(--color-ink-200)] max-w-xl">
+            <span className="font-display text-lg tracking-wide uppercase text-[color:var(--color-ink-100)] mr-2">
+              {league.name}
+            </span>
           </p>
         </div>
 
-        {!isOwner && (
-          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>Only the owner can edit these rules.</span>
-          </div>
-        )}
+        <div className="space-y-3">
+          {!isOwner && (
+            <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-draw-500)]/40 bg-[color:var(--color-draw-500)]/8 text-[color:var(--color-draw-500)] text-sm">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span className="text-[color:var(--color-ink-100)]">Only the owner can edit these rules.</span>
+            </div>
+          )}
 
-        {!rules.editable && (
-          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-            <Lock className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>{SCORING_LOCKED_MESSAGE}</span>
-          </div>
-        )}
+          {!rules.editable && (
+            <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-draw-500)]/40 bg-[color:var(--color-draw-500)]/8">
+              <Lock className="w-4 h-4 mt-0.5 flex-shrink-0 text-[color:var(--color-draw-500)]" />
+              <span className="text-sm text-[color:var(--color-ink-100)]">{SCORING_LOCKED_MESSAGE}</span>
+            </div>
+          )}
 
-        {successMessage && (
-          <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-            <Check className="w-4 h-4 flex-shrink-0" />
-            <span>{successMessage}</span>
-          </div>
-        )}
+          {successMessage && (
+            <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-win-500)]/40 bg-[color:var(--color-win-500)]/8 text-[color:var(--color-win-500)] text-sm">
+              <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>{successMessage}</span>
+            </div>
+          )}
 
-        {saveError && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>{saveError}</span>
-          </div>
-        )}
+          {saveError && (
+            <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8 text-[color:var(--color-loss-500)] text-sm">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>{saveError}</span>
+            </div>
+          )}
+        </div>
 
         <Card>
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <p className="font-mono text-[0.62rem] tracking-[0.25em] uppercase text-[color:var(--color-volt-200)] mb-2">
+              / {readOnly ? 'Viewing' : 'Editing'}
+            </p>
+            <h2 className="font-display text-2xl sm:text-3xl tracking-wide uppercase text-[color:var(--color-ink-50)]">
               {readOnly ? 'Current rules' : 'Edit rules'}
             </h2>
-            <p className="text-sm text-gray-600 mt-0.5">
+            <p className="text-sm text-[color:var(--color-ink-200)] mt-1">
               {readOnly
                 ? 'Review how points are awarded in this league.'
                 : 'Changes apply immediately once saved.'}
@@ -244,13 +256,9 @@ export function EditScoringRulesPage() {
             <Button
               onClick={handleSave}
               disabled={isSaving || hasScoringErrors(errors)}
-              icon={
-                isSaving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Check className="w-4 h-4" />
-                )
-              }
+              isLoading={isSaving}
+              icon={<Check />}
+              iconPosition="right"
             >
               {isSaving ? 'Saving...' : 'Save'}
             </Button>

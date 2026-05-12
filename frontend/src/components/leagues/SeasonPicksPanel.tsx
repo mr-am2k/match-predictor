@@ -92,44 +92,51 @@ export function SeasonPicksPanel({ leagueId }: SeasonPicksPanelProps) {
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 inline-flex items-center gap-2">
-              <Star className="w-5 h-5 text-indigo-600" />
-              Season picks
+            <p className="font-mono text-[0.62rem] tracking-[0.25em] uppercase text-[color:var(--color-volt-200)] mb-2 inline-flex items-center gap-2">
+              <Star className="w-3 h-3" strokeWidth={2.5} />
+              / Season picks
+            </p>
+            <h2 className="font-display text-2xl sm:text-3xl tracking-wide uppercase text-[color:var(--color-ink-50)]">
+              Call the season
             </h2>
-            <p className="text-sm text-gray-600 mt-0.5">
-              Pick the competition winner, top goalscorer, and top assister before
-              the season starts.
+            <p className="text-sm text-[color:var(--color-ink-200)] mt-1 max-w-lg">
+              Pick the competition winner, top goalscorer, and top assister before the season starts.
             </p>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {loading ? (
-          <div className="flex items-center justify-center py-6">
-            <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-5 h-5 text-[color:var(--color-volt-200)] animate-spin" />
           </div>
         ) : error ? (
-          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8 text-[color:var(--color-loss-500)] text-sm">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
         ) : prediction ? (
           <>
             {prediction.locked ? (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                Picks closed when the season started
-                {prediction.locksAt
-                  ? ` on ${formatLockDate(prediction.locksAt)}`
-                  : ''}
-                . Season picks will score when the season ends.
+              <div className="flex items-start gap-3 p-4 rounded-xl border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8">
+                <div className="w-1 h-full self-stretch bg-[color:var(--color-loss-500)] rounded-full" />
+                <div className="text-sm text-[color:var(--color-ink-100)]">
+                  <p className="font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-loss-500)] mb-1">
+                    Picks locked
+                  </p>
+                  Closed when the season started
+                  {prediction.locksAt ? ` on ${formatLockDate(prediction.locksAt)}` : ''}. Season picks
+                  will score when the season ends.
+                </div>
               </div>
             ) : prediction.locksAt ? (
-              <div className="text-sm text-gray-600">
-                Picks lock on{' '}
-                <span className="font-medium text-gray-900">
+              <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-800)]/50">
+                <p className="font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-300)]">
+                  Lock date
+                </p>
+                <p className="font-mono tabular-nums text-sm text-[color:var(--color-volt-200)]">
                   {formatLockDate(prediction.locksAt)}
-                </span>
-                .
+                </p>
               </div>
             ) : null}
 
@@ -142,7 +149,8 @@ export function SeasonPicksPanel({ leagueId }: SeasonPicksPanelProps) {
             <div className="pt-1">
               <Link to={`/leagues/${leagueId}/overall-prediction`}>
                 <Button
-                  icon={<ChevronRight className="w-4 h-4" />}
+                  icon={<ChevronRight />}
+                  iconPosition="right"
                   variant={prediction.locked ? 'outline' : 'primary'}
                 >
                   {prediction.locked
@@ -166,14 +174,21 @@ interface PickCellProps {
 }
 
 function PickCell({ label, value }: PickCellProps) {
+  const hasValue = Boolean(value);
   return (
-    <div className="p-3 bg-gray-50 border border-gray-100 rounded-lg">
-      <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+    <div
+      className={`relative rounded-xl border p-4 overflow-hidden transition-colors ${
+        hasValue
+          ? 'border-[color:var(--color-volt-200)]/30 bg-[color:var(--color-volt-200)]/5'
+          : 'border-dashed border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/60'
+      }`}
+    >
+      <dt className="font-mono text-[0.6rem] tracking-[0.28em] uppercase text-[color:var(--color-ink-300)]">
         {label}
       </dt>
       <dd
-        className={`mt-1 text-sm font-medium ${
-          value ? 'text-gray-900' : 'text-gray-400 italic'
+        className={`mt-2 font-display text-xl tracking-wide uppercase truncate ${
+          hasValue ? 'text-[color:var(--color-ink-50)]' : 'text-[color:var(--color-ink-500)]'
         }`}
       >
         {value ?? 'No pick'}

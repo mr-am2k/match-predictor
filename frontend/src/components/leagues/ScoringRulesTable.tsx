@@ -21,6 +21,8 @@ interface Row {
 }
 
 interface Section {
+  id: string;
+  eyebrow: string;
   title: string;
   subtitle: string;
   rows: Row[];
@@ -28,6 +30,8 @@ interface Section {
 
 const SECTIONS: Section[] = [
   {
+    id: 'per-match',
+    eyebrow: '/ 01',
     title: 'Per match',
     subtitle: 'Points awarded for each fixture prediction.',
     rows: [
@@ -66,6 +70,8 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    id: 'league-wide',
+    eyebrow: '/ 02',
     title: 'League-wide',
     subtitle: 'Season-long predictions resolved once the competition ends.',
     rows: [
@@ -96,6 +102,8 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    id: 'match-multipliers',
+    eyebrow: '/ 03',
     title: 'Per-match multipliers',
     subtitle: 'Multiplies your per-match points when more categories land.',
     rows: [
@@ -126,6 +134,8 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    id: 'league-multipliers',
+    eyebrow: '/ 04',
     title: 'League-wide multipliers',
     subtitle: 'Multiplies your league-wide points when multiple picks land.',
     rows: [
@@ -177,54 +187,71 @@ export function ScoringRulesTable({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {!readOnly && (
         <div className="flex justify-end">
           <button
             type="button"
             onClick={handleReset}
-            className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+            className="inline-flex items-center gap-2 font-mono text-[0.68rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-300)] hover:text-[color:var(--color-volt-200)] transition-colors"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5" />
             Reset to defaults
           </button>
         </div>
       )}
 
       {SECTIONS.map((section) => (
-        <div key={section.title} className="space-y-3">
+        <div key={section.id} className="space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[0.62rem] tracking-[0.28em] uppercase text-[color:var(--color-volt-200)]">
+              {section.eyebrow}
+            </span>
+            <span className="h-[1px] flex-1 bg-[color:var(--color-ink-700)]" />
+          </div>
           <div>
-            <h3 className="font-semibold text-gray-900">{section.title}</h3>
-            <p className="text-sm text-gray-600 mt-0.5">{section.subtitle}</p>
+            <h3 className="font-display text-2xl tracking-wide uppercase text-[color:var(--color-ink-50)]">
+              {section.title}
+            </h3>
+            <p className="text-sm text-[color:var(--color-ink-200)] mt-1">{section.subtitle}</p>
           </div>
 
-          <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-200">
+          <div className="grid sm:grid-cols-2 gap-3">
             {section.rows.map((row) => {
               const fieldValue = value[row.field];
               const error = errors?.[row.field];
+              const hasError = Boolean(error);
               return (
                 <div
                   key={row.field}
-                  className="flex items-center justify-between gap-4 p-4"
+                  className={`group relative rounded-xl border p-4 transition-colors ${
+                    hasError
+                      ? 'border-[color:var(--color-loss-500)]/50 bg-[color:var(--color-loss-500)]/5'
+                      : 'border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/60 hover:border-[color:var(--color-ink-600)]'
+                  }`}
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-gray-900">{row.label}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {row.description}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display text-base tracking-wide uppercase text-[color:var(--color-ink-50)]">
+                        {row.label}
+                      </p>
+                      <p className="text-xs text-[color:var(--color-ink-300)] leading-relaxed mt-1">
+                        {row.description}
+                      </p>
                     </div>
-                    {error && (
-                      <div className="text-xs text-red-600 mt-1">{error}</div>
-                    )}
-                  </div>
-                  <div className="flex-shrink-0">
                     {readOnly ? (
-                      <span className="font-semibold text-gray-900 bg-gray-100 px-3 py-1 rounded-lg text-sm whitespace-nowrap">
-                        {row.isDecimal
-                          ? `${formatValue(fieldValue, true)}x`
-                          : `${fieldValue} ${fieldValue === 1 ? 'pt' : 'pts'}`}
-                      </span>
+                      <div className="flex-shrink-0 text-right">
+                        <div className="inline-flex items-baseline gap-1 px-3 py-1.5 rounded-lg border border-[color:var(--color-volt-200)]/30 bg-[color:var(--color-volt-200)]/5">
+                          <span className="scoreboard text-xl text-[color:var(--color-volt-200)] tabular-nums">
+                            {row.isDecimal ? formatValue(fieldValue, true) : fieldValue}
+                          </span>
+                          <span className="font-mono text-[0.6rem] tracking-[0.2em] uppercase text-[color:var(--color-volt-200)]/80">
+                            {row.isDecimal ? 'x' : fieldValue === 1 ? 'pt' : 'pts'}
+                          </span>
+                        </div>
+                      </div>
                     ) : (
-                      <div className="flex items-center gap-2">
+                      <div className="flex-shrink-0 inline-flex items-center gap-2">
                         <input
                           type="number"
                           min={row.min}
@@ -232,24 +259,26 @@ export function ScoringRulesTable({
                           step={row.isDecimal ? '0.01' : '1'}
                           value={fieldValue}
                           onChange={(e) =>
-                            handleFieldChange(
-                              row.field,
-                              e.target.value,
-                              row.isDecimal
-                            )
+                            handleFieldChange(row.field, e.target.value, row.isDecimal)
                           }
-                          className={`w-24 rounded-lg border px-3 py-2 text-right text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-opacity-50 ${
-                            error
-                              ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                              : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'
+                          className={`w-20 rounded-lg border px-2.5 py-1.5 text-right font-mono tabular-nums text-sm text-[color:var(--color-ink-50)] bg-[color:var(--color-ink-800)] outline-none transition-colors ${
+                            hasError
+                              ? 'border-[color:var(--color-loss-500)]/60 focus:border-[color:var(--color-loss-500)]'
+                              : 'border-[color:var(--color-ink-700)] focus:border-[color:var(--color-volt-200)]/70'
                           }`}
                         />
-                        <span className="text-xs text-gray-500 w-8">
+                        <span className="font-mono text-[0.6rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-400)] w-6">
                           {row.isDecimal ? 'x' : fieldValue === 1 ? 'pt' : 'pts'}
                         </span>
                       </div>
                     )}
                   </div>
+                  {error && (
+                    <p className="mt-2 text-xs text-[color:var(--color-loss-500)] flex items-center gap-1.5">
+                      <span className="inline-block w-1 h-1 rounded-full bg-[color:var(--color-loss-500)]" />
+                      {error}
+                    </p>
+                  )}
                 </div>
               );
             })}
