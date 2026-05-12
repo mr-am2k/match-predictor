@@ -1,6 +1,10 @@
 import { Pencil } from 'lucide-react';
+import { useMemo } from 'react';
 import { Button } from '../ui/Button';
-import type { FixtureWithPrediction } from '../../types/prediction';
+import type {
+  FixtureWithPrediction,
+  PlayerPick,
+} from '../../types/prediction';
 import { LockCountdown } from './LockCountdown';
 
 interface MatchPredictionCardProps {
@@ -25,38 +29,56 @@ function formatKickoff(iso: string): string {
   }).format(date);
 }
 
-function summarisePrediction(fixture: FixtureWithPrediction): string {
+function formatPicks(
+  picks: PlayerPick[],
+  nameById: Map<number, string>
+): string {
+  return picks
+    .map((pick) => {
+      const name = nameById.get(pick.playerId) ?? `Player #${pick.playerId}`;
+      return pick.count > 1 ? `${name} (${pick.count})` : name;
+    })
+    .join(', ');
+}
+
+function summarisePrediction(
+  fixture: FixtureWithPrediction,
+  nameById: Map<number, string>
+): string {
   const prediction = fixture.userPrediction;
   if (!prediction) {
     return 'No prediction yet';
   }
 
-  const parts: string[] = [];
+  const headParts: string[] = [];
   if (prediction.predictedDraw) {
-    parts.push('Draw');
+    headParts.push('Draw');
   } else if (prediction.winnerTeamId === fixture.homeTeam.id) {
-    parts.push(`${fixture.homeTeam.name} win`);
+    headParts.push(`${fixture.homeTeam.name} win`);
   } else if (prediction.winnerTeamId === fixture.awayTeam.id) {
-    parts.push(`${fixture.awayTeam.name} win`);
+    headParts.push(`${fixture.awayTeam.name} win`);
   }
 
   if (prediction.homeScore !== null && prediction.awayScore !== null) {
-    parts.push(`${prediction.homeScore}-${prediction.awayScore}`);
+    headParts.push(`${prediction.homeScore}-${prediction.awayScore}`);
   }
 
-  const scorerCount = prediction.scorerPlayerIds.length;
-  const assisterCount = prediction.assisterPlayerIds.length;
-  if (scorerCount > 0) {
-    parts.push(`${scorerCount} scorer${scorerCount === 1 ? '' : 's'}`);
-  }
-  if (assisterCount > 0) {
-    parts.push(`${assisterCount} assister${assisterCount === 1 ? '' : 's'}`);
+  const segments: string[] = [];
+  if (headParts.length > 0) {
+    segments.push(headParts.join(', '));
   }
 
-  if (parts.length === 0) {
+  if (prediction.scorers.length > 0) {
+    segments.push(`Scorers: ${formatPicks(prediction.scorers, nameById)}`);
+  }
+  if (prediction.assisters.length > 0) {
+    segments.push(`Assisters: ${formatPicks(prediction.assisters, nameById)}`);
+  }
+
+  if (segments.length === 0) {
     return 'No prediction yet';
   }
-  return `You: ${parts.join(', ')}`;
+  return `You: ${segments.join(' · ')}`;
 }
 
 function TeamBadge({
@@ -97,7 +119,17 @@ export function MatchPredictionCard({
   const isFinal = FINAL_STATUSES.has(fixture.status);
   const showActualScore =
     isFinal && fixture.homeScore !== null && fixture.awayScore !== null;
-  const summary = summarisePrediction(fixture);
+  const nameById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const player of fixture.homeSquad) {
+      map.set(player.playerId, player.name);
+    }
+    for (const player of fixture.awaySquad) {
+      map.set(player.playerId, player.name);
+    }
+    return map;
+  }, [fixture.homeSquad, fixture.awaySquad]);
+  const summary = summarisePrediction(fixture, nameById);
   const hasPrediction = fixture.userPrediction !== null;
   const locked = fixture.locked;
 
@@ -160,7 +192,7 @@ export function MatchPredictionCard({
 
       <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
         <p
-          className={`text-sm flex-1 min-w-0 ${hasPrediction ? 'text-gray-700' : 'text-gray-400 italic'}`}
+          className={`text-sm flex-1 min-w-0 line-clamp-2 ${hasPrediction ? 'text-gray-700' : 'text-gray-400 italic'}`}
         >
           {summary}
         </p>

@@ -4,6 +4,7 @@ import { FIXTURE_LOCKED_MESSAGE, upsertPrediction } from '../../api/predictions'
 import type {
   FixtureWithPrediction,
   MyPrediction,
+  PlayerPick,
   UpsertPredictionRequest,
 } from '../../types/prediction';
 import { Button } from '../ui/Button';
@@ -61,11 +62,11 @@ export function MatchPredictionModal({
   const [awayScore, setAwayScore] = useState<string>(
     initialPrediction?.awayScore != null ? String(initialPrediction.awayScore) : ''
   );
-  const [scorerIds, setScorerIds] = useState<number[]>(
-    initialPrediction?.scorerPlayerIds ?? []
+  const [scorerPicks, setScorerPicks] = useState<PlayerPick[]>(
+    initialPrediction?.scorers ?? []
   );
-  const [assisterIds, setAssisterIds] = useState<number[]>(
-    initialPrediction?.assisterPlayerIds ?? []
+  const [assisterPicks, setAssisterPicks] = useState<PlayerPick[]>(
+    initialPrediction?.assisters ?? []
   );
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -91,8 +92,8 @@ export function MatchPredictionModal({
         ? String(fixture.userPrediction.awayScore)
         : ''
     );
-    setScorerIds(fixture.userPrediction?.scorerPlayerIds ?? []);
-    setAssisterIds(fixture.userPrediction?.assisterPlayerIds ?? []);
+    setScorerPicks(fixture.userPrediction?.scorers ?? []);
+    setAssisterPicks(fixture.userPrediction?.assisters ?? []);
     setErrorMessage(null);
     setIsLockedError(false);
     setSubmitting(false);
@@ -126,10 +127,19 @@ export function MatchPredictionModal({
     [fixture.awaySquad]
   );
 
-  const homeScorerCount = scorerIds.filter((id) => homeSquadIds.has(id)).length;
-  const awayScorerCount = scorerIds.filter((id) => awaySquadIds.has(id)).length;
-  const homeAssisterCount = assisterIds.filter((id) => homeSquadIds.has(id)).length;
-  const awayAssisterCount = assisterIds.filter((id) => awaySquadIds.has(id)).length;
+  const sumCounts = (picks: PlayerPick[], squadIds: Set<number>) =>
+    picks.reduce(
+      (acc, pick) => (squadIds.has(pick.playerId) ? acc + pick.count : acc),
+      0
+    );
+
+  const homeScorerCount = sumCounts(scorerPicks, homeSquadIds);
+  const awayScorerCount = sumCounts(scorerPicks, awaySquadIds);
+  const homeAssisterCount = sumCounts(assisterPicks, homeSquadIds);
+  const awayAssisterCount = sumCounts(assisterPicks, awaySquadIds);
+
+  const scorerTotalCount = scorerPicks.reduce((acc, p) => acc + p.count, 0);
+  const assisterTotalCount = assisterPicks.reduce((acc, p) => acc + p.count, 0);
 
   const bothScoresProvided = homeScoreNum != null && awayScoreNum != null;
   // Caps are derived entirely from the predicted score — no global max.
@@ -201,8 +211,8 @@ export function MatchPredictionModal({
       predictedDraw,
       homeScore: homeScoreNum,
       awayScore: awayScoreNum,
-      scorerPlayerIds: scorerIds,
-      assisterPlayerIds: assisterIds,
+      scorers: scorerPicks,
+      assisters: assisterPicks,
     };
 
     try {
@@ -345,15 +355,15 @@ export function MatchPredictionModal({
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-gray-800">Scorers</h3>
               <span className="text-xs text-gray-500">
-                {scorerIds.length}/{scorersTotalCap} selected
+                {scorerTotalCount}/{scorersTotalCap} selected
               </span>
             </div>
             {squadEmpty ? (
               <PlayerMultiSelect
                 players={[]}
-                selectedIds={scorerIds}
-                onChange={setScorerIds}
-                max={homeSideCap + awaySideCap}
+                picks={scorerPicks}
+                onChange={setScorerPicks}
+                maxCount={homeSideCap + awaySideCap}
                 disabled={picksDisabled}
                 emptyMessage="Squad data syncing…"
               />
@@ -365,9 +375,9 @@ export function MatchPredictionModal({
                   </div>
                   <PlayerMultiSelect
                     players={fixture.homeSquad}
-                    selectedIds={scorerIds}
-                    onChange={setScorerIds}
-                    max={homeSideCap}
+                    picks={scorerPicks}
+                    onChange={setScorerPicks}
+                    maxCount={homeSideCap}
                     disabled={picksDisabled}
                     emptyMessage="Squad data syncing…"
                   />
@@ -389,9 +399,9 @@ export function MatchPredictionModal({
                   </div>
                   <PlayerMultiSelect
                     players={fixture.awaySquad}
-                    selectedIds={scorerIds}
-                    onChange={setScorerIds}
-                    max={awaySideCap}
+                    picks={scorerPicks}
+                    onChange={setScorerPicks}
+                    maxCount={awaySideCap}
                     disabled={picksDisabled}
                     emptyMessage="Squad data syncing…"
                   />
@@ -416,15 +426,15 @@ export function MatchPredictionModal({
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-gray-800">Assisters</h3>
               <span className="text-xs text-gray-500">
-                {assisterIds.length}/{assistersTotalCap} selected
+                {assisterTotalCount}/{assistersTotalCap} selected
               </span>
             </div>
             {squadEmpty ? (
               <PlayerMultiSelect
                 players={[]}
-                selectedIds={assisterIds}
-                onChange={setAssisterIds}
-                max={homeAssisterSideCap + awayAssisterSideCap}
+                picks={assisterPicks}
+                onChange={setAssisterPicks}
+                maxCount={homeAssisterSideCap + awayAssisterSideCap}
                 disabled={picksDisabled}
                 emptyMessage="Squad data syncing…"
               />
@@ -436,9 +446,9 @@ export function MatchPredictionModal({
                   </div>
                   <PlayerMultiSelect
                     players={fixture.homeSquad}
-                    selectedIds={assisterIds}
-                    onChange={setAssisterIds}
-                    max={homeAssisterSideCap}
+                    picks={assisterPicks}
+                    onChange={setAssisterPicks}
+                    maxCount={homeAssisterSideCap}
                     disabled={picksDisabled}
                     emptyMessage="Squad data syncing…"
                   />
@@ -460,9 +470,9 @@ export function MatchPredictionModal({
                   </div>
                   <PlayerMultiSelect
                     players={fixture.awaySquad}
-                    selectedIds={assisterIds}
-                    onChange={setAssisterIds}
-                    max={awayAssisterSideCap}
+                    picks={assisterPicks}
+                    onChange={setAssisterPicks}
+                    maxCount={awayAssisterSideCap}
                     disabled={picksDisabled}
                     emptyMessage="Squad data syncing…"
                   />
