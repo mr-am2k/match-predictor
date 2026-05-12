@@ -11,10 +11,6 @@ interface PlayerMultiSelectProps {
   emptyMessage?: string;
 }
 
-function sumCounts(picks: PlayerPick[]): number {
-  return picks.reduce((acc, pick) => acc + pick.count, 0);
-}
-
 // Deterministic avatar hue derived from the player's id — keeps UI lively
 // without needing a colour palette.
 function avatarTone(playerId: number): string {
@@ -74,7 +70,17 @@ export function PlayerMultiSelect({
     () => new Map(picks.map((pick) => [pick.playerId, pick])),
     [picks]
   );
-  const totalCount = sumCounts(picks);
+  // Only picks for players in THIS widget's squad count toward this widget's
+  // cap — home/away share the same `picks` array, so a home pick must not
+  // fill up the away widget's capacity.
+  const squadIds = useMemo(
+    () => new Set(players.map((p) => p.playerId)),
+    [players]
+  );
+  const totalCount = picks.reduce(
+    (acc, pick) => (squadIds.has(pick.playerId) ? acc + pick.count : acc),
+    0
+  );
   const atCapacity = totalCount >= maxCount;
 
   const filteredPlayers = useMemo(() => {
