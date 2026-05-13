@@ -1,6 +1,15 @@
 match-predictor.duckdns.org {
     encode gzip zstd
 
+    header X-Robots-Tag "noindex, nofollow, noarchive, nosnippet"
+
+    handle /robots.txt {
+        header Content-Type text/plain
+        respond "User-agent: *
+Disallow: /
+"
+    }
+
     handle /api/* {
         reverse_proxy backend:8080
     }
