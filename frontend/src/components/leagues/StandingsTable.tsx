@@ -145,8 +145,8 @@ export function StandingsTable({ leagueId }: StandingsTableProps) {
   }, [leagueId, mode, selectedRound]);
 
   const rows = pageData?.content ?? [];
-  const totalPages = pageData?.page.totalPages ?? 0;
-  const currentPage = pageData?.page.number ?? 0;
+  const totalPages = pageData?.page?.totalPages ?? 0;
+  const currentPage = pageData?.page?.number ?? 0;
   const isFirst = currentPage === 0;
   const isLast = totalPages === 0 || currentPage >= totalPages - 1;
 
