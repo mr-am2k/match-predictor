@@ -1,0 +1,62 @@
+services:
+  backend:
+    image: ghcr.io/mr-am2k/match-predictor-backend:${IMAGE_TAG:-latest}
+    container_name: match-predictor-backend
+    restart: unless-stopped
+    expose:
+      - "8080"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_USER=${SUPABASE_USER}
+      - SUPABASE_PASSWORD=${SUPABASE_PASSWORD}
+      - FOOTBALL_API_URL=${FOOTBALL_API_URL}
+      - FOOTBALL_API_KEY=${FOOTBALL_API_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN}
+      - COOKIE_SECURE=${COOKIE_SECURE}
+      - COOKIE_SAME_SITE=${COOKIE_SAME_SITE}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - app
+
+  frontend:
+    image: ghcr.io/mr-am2k/match-predictor-frontend:${IMAGE_TAG:-latest}
+    container_name: match-predictor-frontend
+    restart: unless-stopped
+    expose:
+      - "3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: match-predictor-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    networks:
+      - app
+
+networks:
+  app:
+    enable_ipv6: true
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
