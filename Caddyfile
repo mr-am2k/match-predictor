@@ -1,0 +1,9 @@
+match-predictor.duckdns.org {
+    encode gzip zstd
+
+    handle /api/* {
+        reverse_proxy backend:8080
+    }
+
+    reverse_proxy frontend:3000
+}
