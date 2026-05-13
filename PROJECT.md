@@ -2,7 +2,7 @@
 
 The single source of truth for what's built, how it works, and where to find the code. Phase plans in `.claude/` are the history; this document is the current state.
 
-> **Status snapshot:** Phases 1–3 are merged. Phase 4 (per-match locks, score-driven pick caps, browse-leagues fix) and Phase 3's notifications subsystem are planned but **not yet implemented in the code**. See §15 "Known gaps & planned work."
+> **Status snapshot:** Phases 1–3 are merged. Phase 4's per-fixture locks and score-driven pick caps are shipped. **Pick counts** (each scorer/assister pick carries a predicted goal/assist count, V12) are shipped on top. The browse-leagues 500 fix and Phase 3's notifications subsystem remain unshipped. See §15.
 
 ---
 
@@ -117,7 +117,7 @@ match-predictor/
 ├── docker-compose.yaml                       # Multi-container orchestration
 ├── .env                                      # Environment variables (gitignored)
 ├── PROJECT.md                                # ← you are here
-├── PHASE_4_PLAN.md                           # Next-up plan (not yet implemented)
+├── SCORING_SYSTEM.md                         # Per-pick scoring rules spec (source of truth for §11)
 └── .claude/                                  # Historical plans + implementation notes
 ```
 
@@ -145,6 +145,7 @@ Eleven Flyway migrations (`backend/src/main/resources/db/migration/`):
 | `V9__league_scoring_rules.sql` | `app.league_scoring_rules` + backfill defaults |
 | `V10__league_overall_predictions.sql` | `app.league_overall_predictions`, `app.league_overall_scores` |
 | `V11__leagues_archived.sql` | `leagues.archived BOOLEAN` + index |
+| `V12__prediction_pick_counts.sql` | `prediction_scorers.count`, `prediction_assisters.count` (NOT NULL DEFAULT 1, CHECK ≥ 1) |
 
 ### 4.1 `app.users`
 
@@ -276,20 +277,23 @@ app.predictions                                       -- scalar per-match predic
 app.prediction_scorers
   prediction_id UUID FK ON DELETE CASCADE
   player_id BIGINT
+  count INT NOT NULL DEFAULT 1 CHECK (count >= 1)   -- V12: predicted goals for this player
   PRIMARY KEY (prediction_id, player_id)
 
 app.prediction_assisters                              -- identical shape, separate table
   prediction_id, player_id   PK
+  count INT NOT NULL DEFAULT 1 CHECK (count >= 1)   -- V12: predicted assists for this player
 
 app.prediction_scores                                 -- immutable; one row per settled prediction
   prediction_id UUID PK FK
   points INT NOT NULL
-  breakdown JSONB NOT NULL          -- {winner, score, scorers, assisters, categoriesHit,
-                                    --  baseTotal, multiplier, total, ruleSetVersion}
+  breakdown JSONB NOT NULL          -- {winner, score, scorers:[{playerId,predicted,actual,correct,points}],
+                                    --  assisters:[...], categoriesHit, baseTotal, multiplier, total,
+                                    --  ruleSetVersion}
   settled_at TIMESTAMP NOT NULL
 ```
 
-The split between `_scorers` and `_assisters` keeps DELETE/INSERT churn isolated. Caps are 3 each today (changing to score-driven in Phase 4).
+The split between `_scorers` and `_assisters` keeps DELETE/INSERT churn isolated. Per-pick `count` lets a user express "Haaland scores 2, Foden scores 1" as two rows, or "Haaland scores 2" as a single row. Sum of counts per side is capped at the predicted score for that side (see §9.1).
 
 ### 4.8 `app.league_scoring_rules` (V9)
 
@@ -631,10 +635,12 @@ PUT /api/v1/leagues/{leagueId}/fixtures/{fixtureId}/prediction
   "predictedDraw": false,
   "homeScore": 2,
   "awayScore": 1,
-  "scorerPlayerIds":   [110, 87],
-  "assisterPlayerIds": [276]
+  "scorers":   [{ "playerId": 110, "count": 2 }],                      -- sum per side ≤ that side's predicted score
+  "assisters": [{ "playerId": 276, "count": 1 }]
 }
 ```
+
+Each pick carries a **count** (how many goals/assists that player is predicted for). A user can pick two different players with count=1 each, or one player with count=2 — both are valid ways to predict "2 goals on this side".
 
 Server-side validation (`PredictionServiceImpl.validateRequest`, exceptions all mapped to `400`):
 
@@ -642,15 +648,16 @@ Server-side validation (`PredictionServiceImpl.validateRequest`, exceptions all 
 |---|---|
 | Caller must be a league member | `NotALeagueMemberException → 403` |
 | Fixture must belong to the league's `(competitionId, seasonYear)` | `FixtureNotInLeagueException → 400` |
-| **Lock check** (see §9.2) | `GameweekLockedException → 423` |
+| **Lock check** (see §9.2) | `FixtureLockedException → 423` |
 | `winnerTeamId ∈ {null, homeId, awayId}` | `PredictionValidationException → 400` |
 | `predictedDraw=true` + `winnerTeamId != null` is mutually exclusive | same |
 | Both scores set: must agree with winner pick (home > away for home win, equal for draw, etc.) | same |
 | Scores in `0..20` | same |
-| ≤ 3 scorer ids, ≤ 3 assister ids (global cap, configurable) | same |
-| No duplicates within a list | same |
+| If any scorer/assister picks present, both `homeScore` and `awayScore` are required | same |
+| No duplicate `playerId` within scorers (separately within assisters) | same |
+| Each `count >= 1` | same |
 | Each player ID is in the home or away current squad for `(competition, season)` | same |
-| **(Phase 3) per-side scorer/assister count** ≤ that side's predicted score | same |
+| **Per-side cap**: `sum(pick.count for picks whose player is on side S) ≤ side S's predicted score` | same |
 
 Persistence is one transaction:
 1. Upsert the `predictions` row (unique key `(user, league, fixture)`).
@@ -659,15 +666,13 @@ Persistence is one transaction:
 
 Idempotent — re-sending the same body is a no-op.
 
-### 9.2 Locking model (current)
+### 9.2 Locking model
 
-> **The whole gameweek locks 1 hour before the first kickoff of that round.** FPL-style.
+> **Each fixture locks 15 minutes before its own kickoff.**
 
-`locksAt = min(kickoff_at for fixtures in this round) - 1h`. Once `now >= locksAt`, any `PUT` against any fixture in the round returns `423 Locked`. Same lock value for every fixture in the round.
+`locksAt = fixture.kickoff_at - 15m` per fixture. Once `now >= locksAt`, a `PUT` against that fixture returns `423 Locked` (`FixtureLockedException`). Other fixtures in the same round stay editable until their own lock times.
 
-This prevents the "watch the 3 pm game, then predict the 5 pm game with insider info" loophole.
-
-> **Note:** Phase 4 (not yet implemented) reverses this — per-fixture lock 15 min before the fixture's own kickoff. See `PHASE_4_PLAN.md` §1.
+This shifted from gameweek-wide 1 h locks to per-fixture 15 min during Phase 4, so early-round fixtures don't block edits to later ones.
 
 ### 9.3 Reading gameweeks & fixtures
 
@@ -764,14 +769,16 @@ Scoring is **per league**, controlled by the owner. Stored in `app.league_scorin
 
 Pure function, table-driven, called per `(prediction, fixture, events, rules)`:
 
-| Category | Hit when |
-|---|---|
-| Winner / draw | predicted matches actual |
-| Exact score | both `homeScore` and `awayScore` match |
-| Scorer | ≥ 1 scorer pick appears as a `GOAL` (excluding `Own Goal`) |
-| Assister | ≥ 1 assister pick appears as an `ASSIST` |
+| Category | Hit when | Points awarded |
+|---|---|---|
+| Winner / draw | predicted matches actual | `match_winner_points` once |
+| Exact score | both `homeScore` and `awayScore` match | `match_exact_score_points` once |
+| Scorer | **per pick**: actual goals by that player (own goals excluded) **exactly equals** the predicted `count` | `match_scorer_points` per correct pick |
+| Assister | **per pick**: actual assists by that player exactly equals the predicted `count` | `match_assister_points` per correct pick |
 
-Base points per category use `rules.match_*_points`. Categories-hit count (0..4) determines the multiplier:
+Scorer/assister scoring is **additive and exact**. Two different players at count=1 both correct → 2 × `match_scorer_points`. Predicting one player at count=2 when they scored 1 goal → 0 points for that pick. A player scoring more goals than predicted is also incorrect (exact-match both ways).
+
+Categories-hit count (0..4) determines the multiplier — for scorers/assisters, "category hit" means **≥ 1 pick was exactly correct**:
 
 ```
 multiplier = 4 → rules.match_bonus_4x
@@ -782,7 +789,7 @@ multiplier = 4 → rules.match_bonus_4x
 final_points = round(baseTotal × multiplier)
 ```
 
-The `breakdown` JSONB column preserves `categoriesHit`, `baseTotal`, `multiplier`, `total`, and `ruleSetVersion` (the rules' `updated_at` as ms-epoch). Lets the UI render "1 winner + 2 exact + 3 scorer = 6 × 1.5 = 9" and supports retroactive rule audits.
+The `breakdown` JSONB preserves per-pick `playerId`, `predicted`, `actual`, `correct`, `points` inside `scorers[]` / `assisters[]`, plus `categoriesHit`, `baseTotal`, `multiplier`, `total`, and `ruleSetVersion` (the rules' `updated_at` as ms-epoch). Lets the UI render "Haaland 2/2 ✓ + Foden 1/1 ✓ = 6 × 1.5 = 9" and supports retroactive rule audits.
 
 ### 11.3 The listener
 
@@ -967,7 +974,7 @@ All endpoints are `/api/v1/...`. Errors use RFC 7807 `ProblemDetail` (`applicati
 | `LeagueNotFoundException` | 404 | Unknown league id |
 | `LeagueJoinCodeNotFoundException` | 404 | Unknown join code |
 | `FixtureNotFoundException` | 404 | Unknown fixture id |
-| `GameweekLockedException` | **423** | PUT after gameweek lock |
+| `FixtureLockedException` | **423** | PUT after fixture lock (15 min before kickoff) |
 | `ScoringRulesLockedException` | **423** | PUT rules after first prediction |
 | `OverallPredictionLockedException` | **423** | PUT season pick after `season_start` |
 | `JoinCodeGenerationException` | 500 | 5 collisions in a row (effectively impossible) |
@@ -977,22 +984,26 @@ All endpoints are `/api/v1/...`. Errors use RFC 7807 `ProblemDetail` (`applicati
 
 ## 15. Known gaps & planned work
 
-### 15.1 Phase 4 (planned — see `PHASE_4_PLAN.md`)
+### 15.1 Shipped since the Phase 4 plan was written
 
-- **Per-match lock, 15 min** — replaces the current per-gameweek 1 h lock. Means renaming `GameweekLockedException → FixtureLockedException`, switching the check in `PredictionServiceImpl.upsertPrediction`, adding `lockedAt` per fixture in the response, and trimming `LOCK_LEAD_TIME` in any future notification dispatcher to 15 min.
-- **Score-driven scorer/assister caps** — drop the global `scoring.max-scorers-per-match: 3` (and assister equivalent). Caps become `homeScore` and `awayScore` directly. New server rule: reject pick-with-null-score (the hard cap going away means the loophole must close).
-- **Browse-leagues 500 fix** — wrap `:search` in `CAST(:search AS string)` in `LeagueRepository.findPublicLeagues` and `findAdminLeagues` (Hibernate's null-String parameter type inference goes to `bytea` on Postgres, breaking `LIKE`).
+- **Per-fixture lock, 15 min** — `FixtureLockedException` returns 423 once `kickoff - 15m` passes. Replaced the per-gameweek 1 h lock.
+- **Score-driven scorer/assister caps** — no global cap; sum of per-side counts ≤ that side's predicted score. A request with any scorer/assister picks must include both scores.
+- **Pick counts (V12)** — `prediction_scorers.count` / `prediction_assisters.count`. See §4.7, §9.1, §11.2.
 
-### 15.2 Notifications (Phase 3 PR 23 — documented but **not implemented**)
+### 15.2 Still unshipped
+
+- **Browse-leagues 500** — the `operator does not exist: text ~~ bytea` error when `:search` is null in `LeagueRepository.findPublicLeagues` / `findAdminLeagues`. Fix: `CAST(:search AS string)` on the parameter.
+
+### 15.3 Notifications (Phase 3 PR 23 — documented but **not implemented**)
 
 `PHASE_3_IMPLEMENTATION.md` describes an email subsystem (Resend mailer, `NotificationDispatcher`, lock-reminders + results digest, user prefs page). **None of this exists in the code today** — no `notifications/` package, no `V12` migration, no `NotificationPrefsPage`. Treat the section in that doc as a plan, not as shipped.
 
-### 15.3 Other deferrals
+### 15.4 Other deferrals
 
 - **Tests** — none added in Phase 2 or Phase 3. Existing patterns are mocked-repo unit tests + `@WebMvcTest` slices (see `competition/CompetitionServiceImplTest`, `league/LeagueServiceImplTest`, etc. for Phase 1's templates).
 - **Mid-session 401 interceptor** — only the initial session-resume falls back to `/refresh`. A mid-screen access-token expiry still requires a page reload.
 - **Rank-delta in standings history** — no standings-history table; delta widgets in the digest template (when notifications ship) would have to pass `0, 0`.
-- **`PHASE_3_UI_AUDIT.md`** — 94 frontend findings (1 critical, 13 high). Most notable: modal a11y (no focus trap), join-by-code auto-joins without confirmation, duplicate competitions fetch in the wizard, scorer-cap can total 6 across both sides against a `max=3` global.
+- **`PHASE_3_UI_AUDIT.md`** — 94 frontend findings (1 critical, 13 high). Most notable: modal a11y (no focus trap), join-by-code auto-joins without confirmation, duplicate competitions fetch in the wizard.
 - **Admin "promote to ADMIN" UI** — still a manual SQL UPDATE.
 
 ---
@@ -1027,8 +1038,6 @@ scoring:                                     # defaults source for V9 backfill O
   exact-score-points:      2
   scorer-points:           3
   assister-points:         3
-  max-scorers-per-match:   3                 # going away in Phase 4
-  max-assisters-per-match: 3                 # going away in Phase 4
 
 competition.sync.cron: '0 0 0 1 * *'         # monthly catalog sync
 
@@ -1104,11 +1113,11 @@ Runs the existing Phase 1 mocked-repo tests (`CompetitionServiceImplTest`, `Leag
 | **Competition** | A real-world football competition synced from API-Football. Lives in `external_data.competitions`. Pre-seeded by an admin whitelist. |
 | **League** | A user-created prediction contest on top of one Competition. Lives in `app.leagues`. Public (browseable) or Private (join-code-only). |
 | **Gameweek** | The round string from API-Football (e.g. `"Regular Season - 12"`). Used as the partition key for predictions UI. |
-| **Locked** | Predictions can no longer be edited. Today: per-gameweek, 1 h before first kickoff. Phase 4: per-fixture, 15 min before its own kickoff. |
+| **Locked** | Predictions can no longer be edited. Per-fixture, 15 min before kickoff. |
 | **Settled** | All fixtures in a round are final/cancelled AND the scoring engine has consumed them. |
 | **Season-end / overall prediction** | The one-per-`(user, league)` season-long pick: winner team, top scorer, top assister. Locks at `competition.season_start`. |
 | **Budget** | The 100-calls-per-24h rolling window for API-Football. Tracked via row count in `external_data.api_call_log`. |
 | **Bootstrap** | The one-shot async sync that fires after a league is created on a stale/empty competition. |
-| **Category correct** | One of four (or three, for season picks): winner, exact score, ≥1 scorer hit, ≥1 assister hit. Determines the bonus multiplier. |
+| **Category correct** | One of four (or three, for season picks): winner, exact score, ≥1 correct scorer pick, ≥1 correct assister pick. A scorer/assister pick is "correct" iff the player's actual count exactly equals the predicted count. Determines the bonus multiplier. |
 | **Rule-set version** | The `updated_at` of `league_scoring_rules` as ms-epoch. Persisted into each `prediction_scores.breakdown` for retroactive audit. |
 | **`OFFSET DATETIME`** | All persisted timestamps for kickoffs are `TIMESTAMP WITH TIME ZONE` in UTC. Frontend renders in user-local via `Intl.DateTimeFormat`. |

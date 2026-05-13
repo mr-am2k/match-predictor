@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Gauge, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { getApiCallLog, getSyncStatus } from '../../api/admin';
 import { Button } from '../../components/ui/Button';
 import type { ApiCallLogEntry, SyncStatus } from '../../types/admin';
@@ -29,33 +29,56 @@ function formatRelative(iso: string): string {
   return `${years}y ago`;
 }
 
-function statusColorClasses(code: number | null): string {
-  if (code === null || code < 0) return 'bg-red-100 text-red-700';
-  if (code >= 500) return 'bg-red-100 text-red-700';
-  if (code >= 400) return 'bg-amber-100 text-amber-700';
-  if (code >= 200 && code < 300) return 'bg-green-100 text-green-700';
-  return 'bg-gray-100 text-gray-700';
+type StatusTone = 'win' | 'draw' | 'loss' | 'neutral';
+
+function statusTone(code: number | null): StatusTone {
+  if (code === null || code < 0) return 'loss';
+  if (code >= 500) return 'loss';
+  if (code >= 400) return 'draw';
+  if (code >= 200 && code < 300) return 'win';
+  return 'neutral';
 }
 
-function budgetColor(pct: number): { bar: string; text: string; badge: string } {
+function statusChipClass(tone: StatusTone): string {
+  switch (tone) {
+    case 'win':
+      return 'chip chip-win';
+    case 'draw':
+      return 'chip chip-draw';
+    case 'loss':
+      return 'chip chip-loss';
+    default:
+      return 'chip';
+  }
+}
+
+function budgetTone(pct: number): {
+  bar: string;
+  text: string;
+  chip: string;
+  label: string;
+} {
   if (pct >= 80) {
     return {
-      bar: 'bg-red-500',
-      text: 'text-red-700',
-      badge: 'bg-red-100 text-red-700',
+      bar: 'bg-[color:var(--color-loss-500)]',
+      text: 'text-[color:var(--color-loss-500)]',
+      chip: 'chip chip-loss',
+      label: 'Critical',
     };
   }
   if (pct >= 60) {
     return {
-      bar: 'bg-amber-500',
-      text: 'text-amber-700',
-      badge: 'bg-amber-100 text-amber-700',
+      bar: 'bg-[color:var(--color-draw-500)]',
+      text: 'text-[color:var(--color-draw-500)]',
+      chip: 'chip chip-draw',
+      label: 'Elevated',
     };
   }
   return {
-    bar: 'bg-green-500',
-    text: 'text-green-700',
-    badge: 'bg-green-100 text-green-700',
+    bar: 'bg-[color:var(--color-volt-200)]',
+    text: 'text-[color:var(--color-volt-200)]',
+    chip: 'chip chip-volt',
+    label: 'Nominal',
   };
 }
 
@@ -98,149 +121,348 @@ export function AdminBudgetPage() {
 
   const maxEndpointCount = endpointCounts[0]?.count ?? 0;
 
+  const errorCount = useMemo(
+    () =>
+      log.filter((e) => {
+        const t = statusTone(e.statusCode);
+        return t === 'loss' || t === 'draw';
+      }).length,
+    [log]
+  );
+
+  const pct =
+    status && status.dailyLimit > 0
+      ? Math.min(100, (status.apiCallsUsedLast24h / status.dailyLimit) * 100)
+      : 0;
+  const tones = budgetTone(pct);
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-8">
+      {/* Header */}
+      <header className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between animate-fade-up">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Gauge className="w-6 h-6 text-indigo-600" /> Budget
+          <p className="font-mono text-[0.7rem] tracking-[0.3em] uppercase text-[color:var(--color-volt-200)] mb-3">
+            / Budget
+          </p>
+          <h1 className="font-display text-5xl sm:text-6xl tracking-wide text-[color:var(--color-ink-50)] leading-[0.9]">
+            API call budget
           </h1>
-          <p className="text-gray-600 mt-1 text-sm">
-            Daily API call budget and recent activity.
+          <p className="mt-4 text-sm text-[color:var(--color-ink-200)] max-w-xl">
+            Live readout of the daily upstream quota and the tail of recent
+            provider calls. Monitor pressure before it breaches ceiling.
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
           onClick={load}
-          icon={<RefreshCw className="w-4 h-4" />}
+          icon={<RefreshCw className={isLoading ? 'animate-spin' : ''} />}
           disabled={isLoading}
         >
           Refresh
         </Button>
-      </div>
+      </header>
 
       {isLoading && !status ? (
-        <div className="py-16 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-        </div>
+        <LoadingBlock />
       ) : error ? (
-        <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span>{error}</span>
-        </div>
+        <AlertBanner tone="loss" message={error} />
       ) : status ? (
         <>
-          <BudgetGauge status={status} />
-
-          <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Calls by endpoint
-            </h2>
-            {endpointCounts.length === 0 ? (
-              <p className="text-sm text-gray-500">No API calls logged.</p>
-            ) : (
-              <div className="space-y-2">
-                {endpointCounts.map(({ endpoint, count }) => {
-                  const pct =
-                    maxEndpointCount > 0
-                      ? (count / maxEndpointCount) * 100
-                      : 0;
-                  return (
-                    <div key={endpoint} className="flex items-center gap-3">
-                      <div className="w-64 flex-shrink-0 text-sm font-mono text-gray-700 truncate">
-                        {endpoint}
-                      </div>
-                      <div className="flex-1 bg-gray-100 rounded h-6 relative overflow-hidden">
-                        <div
-                          className="absolute inset-y-0 left-0 bg-indigo-500 rounded transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <div className="w-12 text-right text-sm font-medium text-gray-700">
-                        {count}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+          {/* Scoreboard tiles */}
+          <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 stagger">
+            <ScoreTile
+              label="Used · 24h"
+              value={status.apiCallsUsedLast24h.toLocaleString()}
+              sub={`of ${status.dailyLimit.toLocaleString()}`}
+              accentClass={tones.text}
+              huge
+            />
+            <ScoreTile
+              label="Utilization"
+              value={`${pct.toFixed(0)}%`}
+              sub={tones.label}
+              accentClass={tones.text}
+            />
+            <ScoreTile
+              label="Active comps"
+              value={status.activeCompetitions.length
+                .toString()
+                .padStart(2, '0')}
+              sub="tracked"
+              accentClass="text-[color:var(--color-ink-50)]"
+            />
+            <ScoreTile
+              label="Errors · tail"
+              value={errorCount.toString().padStart(2, '0')}
+              sub={`of last ${log.length}`}
+              accentClass={
+                errorCount > 0
+                  ? 'text-[color:var(--color-loss-500)]'
+                  : 'text-[color:var(--color-ink-50)]'
+              }
+            />
           </section>
 
-          <section className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Recent API calls
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Showing last {log.length} entries.
-              </p>
+          {/* Budget gauge */}
+          <section className="rounded-2xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/85 backdrop-blur overflow-hidden">
+            <div className="px-5 sm:px-6 py-5 border-b border-[color:var(--color-ink-700)] flex items-center justify-between gap-3">
+              <div>
+                <p className="font-mono text-[0.6rem] tracking-[0.28em] uppercase text-[color:var(--color-ink-300)]">
+                  / Gauge
+                </p>
+                <h2 className="font-display text-2xl tracking-wide text-[color:var(--color-ink-50)] mt-0.5">
+                  24-hour pressure
+                </h2>
+              </div>
+              <span className={tones.chip}>{tones.label}</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      When
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      Endpoint
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      Competition
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      Note
-                    </th>
+            <div className="px-5 sm:px-6 py-6 space-y-4">
+              <div className="flex items-baseline justify-between gap-4">
+                <div>
+                  <p className={`scoreboard text-5xl sm:text-6xl leading-none ${tones.text}`}>
+                    {status.apiCallsUsedLast24h.toLocaleString()}
+                    <span className="text-[color:var(--color-ink-400)] text-2xl sm:text-3xl ml-2 font-mono">
+                      / {status.dailyLimit.toLocaleString()}
+                    </span>
+                  </p>
+                  <p className="mt-2 font-mono text-[0.62rem] tracking-[0.26em] uppercase text-[color:var(--color-ink-300)]">
+                    Calls used · last 24 hours
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className={`scoreboard text-4xl ${tones.text}`}>
+                    {pct.toFixed(0)}%
+                  </p>
+                  <p className="mt-1 font-mono text-[0.58rem] tracking-[0.26em] uppercase text-[color:var(--color-ink-400)]">
+                    Utilization
+                  </p>
+                </div>
+              </div>
+
+              <div
+                className="relative w-full h-3 rounded-full overflow-hidden bg-[color:var(--color-ink-800)] border border-[color:var(--color-ink-700)]"
+                role="progressbar"
+                aria-valuenow={Math.round(pct)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div
+                  className={`absolute inset-y-0 left-0 ${tones.bar} transition-[width] duration-500`}
+                  style={{ width: `${pct}%` }}
+                />
+                <div className="absolute inset-0 tick-divider opacity-60 pointer-events-none" />
+              </div>
+
+              {status.activeCompetitions.length > 0 && (
+                <div className="pt-4 border-t border-[color:var(--color-ink-700)]">
+                  <p className="font-mono text-[0.6rem] tracking-[0.26em] uppercase text-[color:var(--color-ink-300)] mb-3">
+                    Active competitions ({status.activeCompetitions.length})
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {status.activeCompetitions.map((c) => (
+                      <span
+                        key={c.competitionId}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-800)]/70 text-xs text-[color:var(--color-ink-100)]"
+                        title={`Teams: ${c.teamCount} · Fixtures: ${c.fixtureCount}`}
+                      >
+                        <span
+                          aria-hidden
+                          className="inline-block w-1.5 h-1.5 rounded-full bg-[color:var(--color-volt-200)]"
+                        />
+                        <span className="font-medium">{c.name}</span>
+                        <span className="font-mono text-[0.62rem] tracking-[0.18em] uppercase text-[color:var(--color-ink-400)]">
+                          {c.seasonYear}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Endpoints histogram */}
+          <section className="rounded-2xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/85 backdrop-blur overflow-hidden">
+            <div className="px-5 sm:px-6 py-5 border-b border-[color:var(--color-ink-700)] flex items-center justify-between gap-3">
+              <div>
+                <p className="font-mono text-[0.6rem] tracking-[0.28em] uppercase text-[color:var(--color-ink-300)]">
+                  / Distribution
+                </p>
+                <h2 className="font-display text-2xl tracking-wide text-[color:var(--color-ink-50)] mt-0.5">
+                  Calls by endpoint
+                </h2>
+              </div>
+              <span className="font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-300)]">
+                {endpointCounts.length} routes
+              </span>
+            </div>
+            <div className="px-5 sm:px-6 py-5">
+              {endpointCounts.length === 0 ? (
+                <p className="font-mono text-[0.7rem] tracking-[0.24em] uppercase text-[color:var(--color-ink-400)] py-6 text-center">
+                  No API calls logged
+                </p>
+              ) : (
+                <ul className="space-y-2.5">
+                  {endpointCounts.map(({ endpoint, count }) => {
+                    const barPct =
+                      maxEndpointCount > 0
+                        ? (count / maxEndpointCount) * 100
+                        : 0;
+                    return (
+                      <li
+                        key={endpoint}
+                        className="flex items-center gap-3 sm:gap-4"
+                      >
+                        <div className="w-40 sm:w-60 md:w-72 shrink-0 font-mono text-[0.72rem] text-[color:var(--color-ink-100)] truncate">
+                          {endpoint}
+                        </div>
+                        <div className="flex-1 h-5 rounded bg-[color:var(--color-ink-800)] border border-[color:var(--color-ink-700)] relative overflow-hidden">
+                          <div
+                            className="absolute inset-y-0 left-0 bg-gradient-to-r from-[color:var(--color-volt-300)] to-[color:var(--color-volt-200)] transition-[width] duration-500"
+                            style={{ width: `${barPct}%` }}
+                          />
+                        </div>
+                        <div className="w-12 sm:w-14 text-right font-mono tabular-nums text-sm font-semibold text-[color:var(--color-ink-50)]">
+                          {count}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </section>
+
+          {/* Request log */}
+          <section className="rounded-2xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/85 backdrop-blur overflow-hidden">
+            <div className="px-5 sm:px-6 py-5 border-b border-[color:var(--color-ink-700)] flex items-center justify-between gap-3">
+              <div>
+                <p className="font-mono text-[0.6rem] tracking-[0.28em] uppercase text-[color:var(--color-ink-300)]">
+                  / Request log
+                </p>
+                <h2 className="font-display text-2xl tracking-wide text-[color:var(--color-ink-50)] mt-0.5">
+                  Recent calls
+                </h2>
+              </div>
+              <span className="font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-300)] hidden sm:inline-flex items-center gap-2">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[color:var(--color-win-500)] animate-volt-pulse" />
+                Tail {log.length}
+              </span>
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-[color:var(--color-ink-700)]">
+                    <Th>When</Th>
+                    <Th>Endpoint</Th>
+                    <Th align="right">Comp</Th>
+                    <Th>Status</Th>
+                    <Th>Note</Th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody>
                   {log.length === 0 ? (
                     <tr>
                       <td
                         colSpan={5}
-                        className="px-4 py-10 text-center text-sm text-gray-500"
+                        className="px-4 py-16 text-center font-mono text-[0.7rem] tracking-[0.24em] uppercase text-[color:var(--color-ink-400)]"
                       >
-                        No API calls logged yet.
+                        No API calls logged yet
                       </td>
                     </tr>
                   ) : (
-                    log.map((entry) => (
-                      <tr key={entry.id} className="hover:bg-gray-50">
-                        <td
-                          className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap"
-                          title={formatAbsolute(entry.calledAt)}
+                    log.map((entry) => {
+                      const tone = statusTone(entry.statusCode);
+                      return (
+                        <tr
+                          key={entry.id}
+                          className="border-b border-[color:var(--color-ink-700)] hover:bg-[color:var(--color-ink-800)]/40 transition-colors"
                         >
-                          {formatRelative(entry.calledAt)}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-mono text-gray-700">
-                          {entry.endpoint}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          {entry.competitionId ?? '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusColorClasses(
-                              entry.statusCode
-                            )}`}
+                          <td
+                            className="px-4 py-3 font-mono tabular-nums text-[0.72rem] text-[color:var(--color-ink-100)] whitespace-nowrap"
+                            title={formatAbsolute(entry.calledAt)}
                           >
-                            {entry.statusCode === null || entry.statusCode < 0
-                              ? 'ERR'
-                              : entry.statusCode}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600 max-w-md truncate">
-                          {entry.note ?? '—'}
-                        </td>
-                      </tr>
-                    ))
+                            {formatRelative(entry.calledAt)}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-[0.72rem] text-[color:var(--color-ink-50)] max-w-[26rem] truncate">
+                            {entry.endpoint}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono tabular-nums text-sm text-[color:var(--color-ink-200)]">
+                            {entry.competitionId ?? (
+                              <span className="text-[color:var(--color-ink-500)]">
+                                —
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={statusChipClass(tone)}>
+                              {entry.statusCode === null || entry.statusCode < 0
+                                ? 'ERR'
+                                : entry.statusCode}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-[color:var(--color-ink-200)] max-w-md truncate">
+                            {entry.note ?? (
+                              <span className="text-[color:var(--color-ink-500)]">
+                                —
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile: stacked rows */}
+            <div className="md:hidden flex flex-col divide-y divide-[color:var(--color-ink-700)]">
+              {log.length === 0 ? (
+                <div className="px-5 py-16 text-center font-mono text-[0.7rem] tracking-[0.24em] uppercase text-[color:var(--color-ink-400)]">
+                  No API calls logged yet
+                </div>
+              ) : (
+                log.map((entry) => {
+                  const tone = statusTone(entry.statusCode);
+                  return (
+                    <div key={entry.id} className="px-5 py-4 space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <span
+                          className="font-mono tabular-nums text-[0.7rem] text-[color:var(--color-ink-200)]"
+                          title={formatAbsolute(entry.calledAt)}
+                        >
+                          {formatRelative(entry.calledAt)}
+                        </span>
+                        <span className={statusChipClass(tone)}>
+                          {entry.statusCode === null || entry.statusCode < 0
+                            ? 'ERR'
+                            : entry.statusCode}
+                        </span>
+                      </div>
+                      <p className="font-mono text-[0.72rem] text-[color:var(--color-ink-50)] break-all">
+                        {entry.endpoint}
+                      </p>
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <span className="font-mono tracking-[0.18em] uppercase text-[color:var(--color-ink-400)]">
+                          Comp{' '}
+                          <span className="text-[color:var(--color-ink-200)]">
+                            {entry.competitionId ?? '—'}
+                          </span>
+                        </span>
+                        {entry.note && (
+                          <span className="text-[color:var(--color-ink-300)] truncate text-right">
+                            {entry.note}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </section>
         </>
@@ -249,56 +471,90 @@ export function AdminBudgetPage() {
   );
 }
 
-function BudgetGauge({ status }: { status: SyncStatus }) {
-  const { apiCallsUsedLast24h, dailyLimit } = status;
-  const pct =
-    dailyLimit > 0
-      ? Math.min(100, (apiCallsUsedLast24h / dailyLimit) * 100)
-      : 0;
-  const colors = budgetColor(pct);
+/* ---------- Helpers ---------- */
 
+function Th({
+  children,
+  align = 'left',
+}: {
+  children: React.ReactNode;
+  align?: 'left' | 'right';
+}) {
   return (
-    <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-      <div className="flex items-baseline justify-between gap-4 mb-3">
-        <div>
-          <p className="text-sm text-gray-500">Used in last 24h</p>
-          <p className={`text-3xl font-bold ${colors.text}`}>
-            {apiCallsUsedLast24h}{' '}
-            <span className="text-lg text-gray-400 font-medium">
-              / {dailyLimit}
-            </span>
-          </p>
-        </div>
-        <span
-          className={`px-2 py-1 rounded text-xs font-semibold ${colors.badge}`}
-        >
-          {pct.toFixed(0)}%
-        </span>
-      </div>
-      <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full ${colors.bar} transition-all`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      {status.activeCompetitions.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-            Active competitions ({status.activeCompetitions.length})
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {status.activeCompetitions.map((c) => (
-              <span
-                key={c.competitionId}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs"
-                title={`Teams: ${c.teamCount} · Fixtures: ${c.fixtureCount}`}
-              >
-                {c.name} ({c.seasonYear})
-              </span>
-            ))}
-          </div>
-        </div>
+    <th
+      className={`px-4 py-3 font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-300)] ${
+        align === 'right' ? 'text-right' : 'text-left'
+      }`}
+      scope="col"
+    >
+      {children}
+    </th>
+  );
+}
+
+function ScoreTile({
+  label,
+  value,
+  sub,
+  accentClass,
+  huge,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accentClass: string;
+  huge?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/85 backdrop-blur px-5 py-4">
+      <p className="font-mono text-[0.58rem] tracking-[0.28em] uppercase text-[color:var(--color-ink-300)]">
+        {label}
+      </p>
+      <p
+        className={`mt-2 scoreboard leading-none ${accentClass} ${
+          huge ? 'text-4xl sm:text-5xl' : 'text-3xl sm:text-4xl'
+        }`}
+      >
+        {value}
+      </p>
+      {sub && (
+        <p className="mt-2 font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-400)]">
+          {sub}
+        </p>
       )}
-    </section>
+    </div>
+  );
+}
+
+function LoadingBlock() {
+  return (
+    <div className="py-24 flex flex-col items-center justify-center gap-3">
+      <Loader2 className="w-7 h-7 text-[color:var(--color-volt-200)] animate-spin" />
+      <p className="font-mono text-[0.62rem] tracking-[0.3em] uppercase text-[color:var(--color-ink-300)]">
+        Loading telemetry…
+      </p>
+    </div>
+  );
+}
+
+function AlertBanner({
+  tone,
+  message,
+}: {
+  tone: 'loss' | 'draw';
+  message: string;
+}) {
+  const toneClasses =
+    tone === 'loss'
+      ? 'border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8 text-[color:var(--color-loss-500)]'
+      : 'border-[color:var(--color-draw-500)]/40 bg-[color:var(--color-draw-500)]/8 text-[color:var(--color-draw-500)]';
+  return (
+    <div
+      className={`flex items-start gap-3 p-4 rounded-xl border ${toneClasses}`}
+      role="alert"
+    >
+      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+      <p className="flex-1 text-sm">{message}</p>
+    </div>
   );
 }

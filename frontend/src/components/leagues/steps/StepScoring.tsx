@@ -9,12 +9,16 @@ interface StepScoringProps {
 
 export function StepScoring({ scoringRules, onChange, errors }: StepScoringProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fade-up">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Scoring system</h2>
-        <p className="text-gray-600 mt-1">
-          Tune how points are awarded in your league. You can change these later until
-          predictions are submitted.
+        <p className="font-mono text-[0.68rem] tracking-[0.3em] uppercase text-[color:var(--color-volt-200)] mb-3">
+          / Step 04 — The scoring dial
+        </p>
+        <h2 className="font-display text-4xl sm:text-5xl tracking-wide text-[color:var(--color-ink-50)]">
+          Tune the scoring.
+        </h2>
+        <p className="mt-3 text-[color:var(--color-ink-200)] max-w-xl">
+          Decide what wins this league — exact scores, scorer hunches, or bravery multipliers. Changes lock the moment the first prediction lands.
         </p>
       </div>
 

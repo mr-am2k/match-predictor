@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AlertCircle, ArrowLeft, Check, Loader2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
 import { joinLeagueByCode } from '../api/leagues';
 import { Button } from '../components/ui/Button';
-import { Card, CardContent, CardHeader } from '../components/ui/Card';
 import type { League } from '../types/league';
 
 export function JoinLeagueByCodePage() {
@@ -45,72 +44,101 @@ export function JoinLeagueByCodePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
-        <div className="flex items-center gap-2 text-gray-600">
-          <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
-          <span>Joining league...</span>
+      <div className="min-h-[calc(100vh-72px)] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 text-[color:var(--color-volt-200)] animate-spin" />
+          <div className="text-center">
+            <p className="font-mono text-[0.65rem] tracking-[0.3em] uppercase text-[color:var(--color-volt-200)] mb-2">
+              / Redeeming code
+            </p>
+            <p className="font-display text-2xl tracking-wide uppercase text-[color:var(--color-ink-50)]">
+              Joining league...
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-8">
-      <div className="max-w-xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-[calc(100vh-72px)]">
+      <div className="max-w-xl mx-auto px-4 sm:px-6 lg:px-10 py-14">
         {error || !league ? (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2 text-red-700">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <h1 className="text-lg font-semibold">Could not join league</h1>
+          <div className="animate-fade-up relative overflow-hidden rounded-2xl border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-ink-850)]/80 p-8 sm:p-10">
+            <div aria-hidden className="absolute -top-24 -right-24 w-60 h-60 rounded-full bg-[color:var(--color-loss-500)]/15 blur-3xl" />
+            <div className="relative">
+              <div className="inline-flex items-center gap-2 mb-5 font-mono text-[0.62rem] tracking-[0.28em] uppercase text-[color:var(--color-loss-500)]">
+                <AlertCircle className="w-3.5 h-3.5" />
+                / Denied
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">
+              <h1 className="font-display text-4xl sm:text-5xl tracking-wide text-[color:var(--color-ink-50)] leading-[0.9]">
+                Could not join
+                <br />
+                <span className="text-[color:var(--color-loss-500)]">league.</span>
+              </h1>
+              <p className="mt-5 text-sm text-[color:var(--color-ink-200)]">
                 {error ?? 'The join code may be invalid or expired.'}
               </p>
-              <Link to="/dashboard">
-                <Button variant="outline" icon={<ArrowLeft className="w-4 h-4" />}>
-                  Back to dashboard
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2 text-green-700">
-                <Check className="w-5 h-5 flex-shrink-0" />
-                <h1 className="text-lg font-semibold">You're in!</h1>
+              <div className="mt-8">
+                <Link to="/dashboard">
+                  <Button variant="outline" icon={<ArrowLeft />}>
+                    Back to dashboard
+                  </Button>
+                </Link>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-gray-700">
-                You joined{' '}
-                <span className="font-semibold text-gray-900">"{league.name}"</span>.
+            </div>
+          </div>
+        ) : (
+          <div className="animate-fade-up relative overflow-hidden rounded-2xl border border-[color:var(--color-volt-200)]/40 bg-[color:var(--color-ink-850)]/80 p-8 sm:p-10">
+            <div aria-hidden className="absolute inset-0 stadium-mesh opacity-50 [mask-image:radial-gradient(ellipse_at_top_right,black_20%,transparent_80%)]" />
+            <div aria-hidden className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-[color:var(--color-volt-200)]/20 blur-3xl" />
+            <div className="relative">
+              <div className="inline-flex items-center gap-2 mb-5 chip chip-win">
+                <Check className="w-3.5 h-3.5" strokeWidth={3} />
+                You're in
+              </div>
+              <p className="font-mono text-[0.65rem] tracking-[0.3em] uppercase text-[color:var(--color-volt-200)] mb-3">
+                / Joined
               </p>
-              <div className="flex items-center gap-3">
+              <h1 className="font-display text-4xl sm:text-5xl tracking-wide text-[color:var(--color-ink-50)] leading-[0.9] break-words">
+                {league.name}
+              </h1>
+
+              <div className="mt-8 p-4 rounded-xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-800)]/60 flex items-center gap-3">
                 {league.competition.logoUrl && (
                   <img
                     src={league.competition.logoUrl}
                     alt=""
-                    className="w-8 h-8 object-contain"
+                    className="w-10 h-10 object-contain flex-shrink-0"
                   />
                 )}
-                <div className="text-sm text-gray-600">
-                  {league.competition.name} · Season {league.competition.seasonYear}
+                <div className="min-w-0">
+                  <p className="font-display text-base tracking-wide uppercase text-[color:var(--color-ink-50)] truncate">
+                    {league.competition.name}
+                  </p>
+                  <p className="font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-volt-200)] mt-0.5">
+                    Season {league.competition.seasonYear}
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 pt-2">
-                <Button onClick={() => navigate(`/leagues/${league.id}`)}>
+
+              <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                <Button
+                  onClick={() => navigate(`/leagues/${league.id}`)}
+                  icon={<ArrowRight />}
+                  iconPosition="right"
+                  size="lg"
+                >
                   Go to league
                 </Button>
                 <Link to="/dashboard">
-                  <Button variant="outline">Back to dashboard</Button>
+                  <Button variant="outline" size="lg">
+                    Back to dashboard
+                  </Button>
                 </Link>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
       </div>
     </div>

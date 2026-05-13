@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Loader2, CalendarClock } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getGameweekFixtures, listGameweeks } from '../api/fixtures';
@@ -21,8 +21,6 @@ function pickDefaultRound(gameweeks: GameweekSummary[]): string | null {
   const open = gameweeks.filter((gw) => gw.status === 'OPEN');
   if (open.length > 0) {
     const sorted = [...open].sort((a, b) => {
-      // Gameweeks with a pending lock come first, ordered by locksAt; those with
-      // no pending fixture (locksAt = null) fall to the end.
       const aMs = a.locksAt ? new Date(a.locksAt).getTime() : Number.POSITIVE_INFINITY;
       const bMs = b.locksAt ? new Date(b.locksAt).getTime() : Number.POSITIVE_INFINITY;
       return aMs - bMs;
@@ -51,7 +49,6 @@ export function GameweekPredictionsPage() {
   const [editingFixtureId, setEditingFixtureId] = useState<number | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
-  // Load league metadata
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -69,7 +66,6 @@ export function GameweekPredictionsPage() {
     };
   }, [id]);
 
-  // Load gameweeks
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -84,9 +80,7 @@ export function GameweekPredictionsPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setGameweeksError(
-          err instanceof Error ? err.message : 'Failed to load gameweeks'
-        );
+        setGameweeksError(err instanceof Error ? err.message : 'Failed to load gameweeks');
       })
       .finally(() => {
         if (cancelled) return;
@@ -98,7 +92,6 @@ export function GameweekPredictionsPage() {
     };
   }, [id, reloadToken]);
 
-  // Load fixtures for the selected round
   useEffect(() => {
     if (!id || !selectedRound) {
       setFixturesData(null);
@@ -114,9 +107,7 @@ export function GameweekPredictionsPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setFixturesError(
-          err instanceof Error ? err.message : 'Failed to load fixtures'
-        );
+        setFixturesError(err instanceof Error ? err.message : 'Failed to load fixtures');
       })
       .finally(() => {
         if (cancelled) return;
@@ -138,8 +129,7 @@ export function GameweekPredictionsPage() {
       if (!fixturesData || editingFixtureId == null) return;
 
       const wasNew =
-        fixturesData.fixtures.find((f) => f.id === editingFixtureId)
-          ?.userPrediction === null;
+        fixturesData.fixtures.find((f) => f.id === editingFixtureId)?.userPrediction === null;
 
       const updatedFixtures = fixturesData.fixtures.map((f) =>
         f.id === editingFixtureId ? { ...f, userPrediction: updated } : f
@@ -151,10 +141,7 @@ export function GameweekPredictionsPage() {
           prev
             ? prev.map((gw) =>
                 gw.round === fixturesData.round
-                  ? {
-                      ...gw,
-                      userPredictionCount: gw.userPredictionCount + 1,
-                    }
+                  ? { ...gw, userPredictionCount: gw.userPredictionCount + 1 }
                   : gw
               )
             : prev
@@ -164,116 +151,138 @@ export function GameweekPredictionsPage() {
     [fixturesData, editingFixtureId]
   );
 
-  if (!id) {
-    return null;
-  }
+  if (!id) return null;
+
+  const predictionCount = fixturesData
+    ? fixturesData.fixtures.filter((f) => f.userPrediction !== null).length
+    : 0;
+  const totalFixtures = fixturesData?.fixtures.length ?? 0;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <div className="min-h-[calc(100vh-72px)]">
+      <div className="max-w-[72rem] mx-auto px-4 sm:px-6 lg:px-10 py-8 sm:py-12">
         <Link
           to={`/leagues/${id}`}
-          className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+          className="inline-flex items-center gap-1.5 font-mono text-[0.7rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-300)] hover:text-[color:var(--color-volt-200)] transition-colors mb-8"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to league
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to league
         </Link>
 
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Predictions{league ? ` for ${league.name}` : ''}
+        {/* Header */}
+        <div className="animate-fade-up">
+          <p className="font-mono text-[0.7rem] tracking-[0.3em] uppercase text-[color:var(--color-volt-200)] mb-3">
+            / Matchday · Predictions
+          </p>
+          <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl tracking-wide text-[color:var(--color-ink-50)] leading-[0.9]">
+            {league ? league.name : 'Loading…'}
           </h1>
           {league && (
-            <p className="text-sm text-gray-600 mt-0.5">
+            <p className="mt-3 font-mono text-[0.75rem] tracking-[0.15em] uppercase text-[color:var(--color-ink-300)]">
               {league.competition.name} · Season {league.competition.seasonYear}
             </p>
           )}
-          {leagueError && (
-            <div className="mt-3 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{leagueError}</span>
-            </div>
-          )}
         </div>
 
-        {/* Gameweek picker */}
-        {gameweeksLoading ? (
-          <div className="flex items-center justify-center p-8">
-            <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+        {leagueError && (
+          <div className="mt-5 flex items-center gap-2 p-3.5 rounded-lg border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8 text-[color:var(--color-loss-500)] text-sm">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{leagueError}</span>
           </div>
-        ) : gameweeksError ? (
-          <div className="flex items-center justify-between gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{gameweeksError}</span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setReloadToken((t) => t + 1)}
-            >
-              Retry
-            </Button>
-          </div>
-        ) : gameweeks && gameweeks.length === 0 ? (
-          <div className="p-8 bg-white border border-dashed border-gray-300 rounded-xl text-center text-gray-500">
-            <p className="font-medium text-gray-700">Fixtures syncing…</p>
-            <p className="text-sm mt-1">
-              We're pulling the latest fixtures for this competition. Check back shortly.
-            </p>
-          </div>
-        ) : gameweeks ? (
-          <GameweekPicker
-            gameweeks={gameweeks}
-            selectedRound={selectedRound}
-            onSelect={setSelectedRound}
-          />
-        ) : null}
+        )}
 
-        {/* Fixtures panel */}
+        {/* Gameweek picker */}
+        <div className="mt-10">
+          {gameweeksLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 text-[color:var(--color-volt-200)] animate-spin" />
+            </div>
+          ) : gameweeksError ? (
+            <div className="flex items-center justify-between gap-3 p-4 rounded-lg border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8 text-[color:var(--color-loss-500)] text-sm">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{gameweeksError}</span>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setReloadToken((t) => t + 1)}>
+                Retry
+              </Button>
+            </div>
+          ) : gameweeks && gameweeks.length === 0 ? (
+            <EmptyPanel
+              title="Fixtures syncing…"
+              body="We're pulling the latest fixtures for this competition. Check back shortly."
+            />
+          ) : gameweeks ? (
+            <GameweekPicker
+              gameweeks={gameweeks}
+              selectedRound={selectedRound}
+              onSelect={setSelectedRound}
+            />
+          ) : null}
+        </div>
+
+        {/* Fixtures */}
         {selectedRound && (
-          <div className="space-y-4">
+          <div className="mt-8 space-y-5">
             {fixturesLoading ? (
-              <div className="flex items-center justify-center p-10">
-                <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 text-[color:var(--color-volt-200)] animate-spin" />
               </div>
             ) : fixturesError ? (
-              <div className="flex items-center justify-between gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              <div className="flex items-center justify-between gap-3 p-4 rounded-lg border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8 text-[color:var(--color-loss-500)] text-sm">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{fixturesError}</span>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setReloadToken((t) => t + 1)}
-                >
+                <Button size="sm" variant="outline" onClick={() => setReloadToken((t) => t + 1)}>
                   Retry
                 </Button>
               </div>
             ) : fixturesData ? (
               <>
-                <div className="flex items-center justify-between flex-wrap gap-2 p-3 bg-white border border-gray-200 rounded-lg">
-                  <div className="text-sm font-medium text-gray-700">
-                    {fixturesData.fixtures.length}{' '}
-                    {fixturesData.fixtures.length === 1 ? 'fixture' : 'fixtures'}
+                {/* Gameweek summary strip */}
+                <div className="rounded-xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/80 backdrop-blur p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-6">
+                    <div>
+                      <p className="font-mono text-[0.6rem] tracking-[0.25em] uppercase text-[color:var(--color-ink-300)] mb-1">
+                        Gameweek {fixturesData.round}
+                      </p>
+                      <p className="font-display text-3xl text-[color:var(--color-ink-50)] tracking-wide">
+                        {totalFixtures} {totalFixtures === 1 ? 'FIXTURE' : 'FIXTURES'}
+                      </p>
+                    </div>
+                    <div className="hidden sm:block h-10 w-px bg-[color:var(--color-ink-700)]" />
+                    <div>
+                      <p className="font-mono text-[0.6rem] tracking-[0.25em] uppercase text-[color:var(--color-ink-300)] mb-1">
+                        Picks made
+                      </p>
+                      <p className="scoreboard text-3xl text-[color:var(--color-volt-200)]">
+                        {predictionCount}
+                        <span className="text-[color:var(--color-ink-400)] text-xl">/{totalFixtures}</span>
+                      </p>
+                    </div>
                   </div>
+
                   {fixturesData.locksAt && (
-                    <div className="flex items-center gap-1 text-sm">
-                      <span className="text-gray-500">Earliest match locks in</span>
-                      <LockCountdown locksAt={fixturesData.locksAt} />
+                    <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-900)]/60">
+                      <CalendarClock className="w-4 h-4 text-[color:var(--color-ink-300)]" />
+                      <div className="text-right">
+                        <p className="font-mono text-[0.58rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-300)]">
+                          Earliest lock
+                        </p>
+                        <LockCountdown locksAt={fixturesData.locksAt} />
+                      </div>
                     </div>
                   )}
                 </div>
 
                 {fixturesData.fixtures.length === 0 ? (
-                  <div className="p-8 bg-white border border-dashed border-gray-300 rounded-xl text-center text-gray-500">
-                    <p className="font-medium text-gray-700">No fixtures yet</p>
-                    <p className="text-sm mt-1">
-                      Fixtures for this gameweek haven't been synced yet.
-                    </p>
-                  </div>
+                  <EmptyPanel
+                    title="No fixtures yet"
+                    body="Fixtures for this gameweek haven't been synced yet."
+                  />
                 ) : (
-                  <div className="grid gap-3">
+                  <div className="grid gap-3 stagger">
                     {fixturesData.fixtures.map((fixture) => (
                       <MatchPredictionCard
                         key={fixture.id}
@@ -298,6 +307,15 @@ export function GameweekPredictionsPage() {
           onSaved={handlePredictionSaved}
         />
       )}
+    </div>
+  );
+}
+
+function EmptyPanel({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/40 p-10 text-center">
+      <p className="font-display text-3xl tracking-wide text-[color:var(--color-ink-100)]">{title}</p>
+      <p className="mt-2 text-sm text-[color:var(--color-ink-300)]">{body}</p>
     </div>
   );
 }

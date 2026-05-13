@@ -22,13 +22,18 @@ export interface PlayerSummary {
   position: string | null;
 }
 
+export interface PlayerPick {
+  playerId: number;
+  count: number;
+}
+
 export interface MyPrediction {
   winnerTeamId: number | null;
   predictedDraw: boolean;
   homeScore: number | null;
   awayScore: number | null;
-  scorerPlayerIds: number[];
-  assisterPlayerIds: number[];
+  scorers: PlayerPick[];
+  assisters: PlayerPick[];
 }
 
 export interface FixtureWithPrediction {
@@ -58,6 +63,6 @@ export interface UpsertPredictionRequest {
   predictedDraw: boolean;
   homeScore: number | null;
   awayScore: number | null;
-  scorerPlayerIds: number[];
-  assisterPlayerIds: number[];
+  scorers: PlayerPick[];
+  assisters: PlayerPick[];
 }

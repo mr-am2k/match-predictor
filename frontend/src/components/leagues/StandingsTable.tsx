@@ -24,6 +24,13 @@ function shortenRound(round: string): string {
   return round;
 }
 
+function rankTone(rank: number): string {
+  if (rank === 1) return 'text-[color:var(--color-volt-200)]';
+  if (rank === 2) return 'text-[color:var(--color-ink-100)]';
+  if (rank === 3) return 'text-[color:var(--color-draw-500)]';
+  return 'text-[color:var(--color-ink-300)]';
+}
+
 export function StandingsTable({ leagueId }: StandingsTableProps) {
   const { user } = useAuth();
   const [mode, setMode] = useState<Mode>('all-time');
@@ -43,7 +50,6 @@ export function StandingsTable({ leagueId }: StandingsTableProps) {
   const [gwError, setGwError] = useState<string | null>(null);
   const [gwLoading, setGwLoading] = useState(false);
 
-  // Load all-time standings page
   useEffect(() => {
     if (mode !== 'all-time') return;
     let cancelled = false;
@@ -69,7 +75,6 @@ export function StandingsTable({ leagueId }: StandingsTableProps) {
     };
   }, [leagueId, page, mode]);
 
-  // Load gameweeks when switching to gameweek mode
   useEffect(() => {
     if (mode !== 'gameweek') return;
     if (gameweeks !== null) return;
@@ -84,7 +89,6 @@ export function StandingsTable({ leagueId }: StandingsTableProps) {
         setGameweeks(data);
         const settled = data.filter((gw) => gw.status === 'SETTLED');
         if (settled.length > 0) {
-          // pick the latest settled round by firstKickoffAt (locksAt can be null once all fixtures are locked)
           const sorted = [...settled].sort(
             (a, b) =>
               new Date(b.firstKickoffAt).getTime() -
@@ -111,7 +115,6 @@ export function StandingsTable({ leagueId }: StandingsTableProps) {
     };
   }, [leagueId, mode, gameweeks]);
 
-  // Load gameweek standings when round changes
   useEffect(() => {
     if (mode !== 'gameweek' || !selectedRound) {
       return;
@@ -150,16 +153,16 @@ export function StandingsTable({ leagueId }: StandingsTableProps) {
   const roundOptions = useMemo(() => gameweeks ?? [], [gameweeks]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Mode toggle */}
-      <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+      <div className="inline-flex rounded-lg border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/70 p-1 font-mono text-[0.7rem] tracking-[0.2em] uppercase">
         <button
           type="button"
           onClick={() => setMode('all-time')}
-          className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+          className={`px-4 py-2 rounded-md transition-colors ${
             mode === 'all-time'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-[color:var(--color-volt-200)] text-[color:var(--color-ink-950)] shadow-[0_4px_14px_-4px_rgba(215,255,61,0.5)]'
+              : 'text-[color:var(--color-ink-200)] hover:text-[color:var(--color-ink-50)]'
           }`}
         >
           All-time
@@ -167,10 +170,10 @@ export function StandingsTable({ leagueId }: StandingsTableProps) {
         <button
           type="button"
           onClick={() => setMode('gameweek')}
-          className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+          className={`px-4 py-2 rounded-md transition-colors ${
             mode === 'gameweek'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-[color:var(--color-volt-200)] text-[color:var(--color-ink-950)] shadow-[0_4px_14px_-4px_rgba(215,255,61,0.5)]'
+              : 'text-[color:var(--color-ink-200)] hover:text-[color:var(--color-ink-50)]'
           }`}
         >
           By gameweek
@@ -210,6 +213,41 @@ export function StandingsTable({ leagueId }: StandingsTableProps) {
   );
 }
 
+interface EmptyBoardProps {
+  label: string;
+}
+
+function EmptyBoard({ label }: EmptyBoardProps) {
+  return (
+    <div className="py-14 text-center rounded-xl border border-dashed border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/40">
+      <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-800)] mb-4">
+        <Trophy className="w-5 h-5 text-[color:var(--color-ink-400)]" />
+      </div>
+      <p className="font-mono text-[0.62rem] tracking-[0.3em] uppercase text-[color:var(--color-ink-400)] mb-2">
+        / No data yet
+      </p>
+      <p className="text-sm text-[color:var(--color-ink-200)]">{label}</p>
+    </div>
+  );
+}
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8 text-[color:var(--color-loss-500)] text-sm">
+      <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+function LoadingBlock() {
+  return (
+    <div className="py-14 flex items-center justify-center">
+      <Loader2 className="w-6 h-6 text-[color:var(--color-volt-200)] animate-spin" />
+    </div>
+  );
+}
+
 interface AllTimeViewProps {
   rows: StandingsRow[];
   isLoading: boolean;
@@ -235,46 +273,23 @@ function AllTimeView({
   onPrev,
   onNext,
 }: AllTimeViewProps) {
-  if (isLoading) {
-    return (
-      <div className="py-12 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-        <AlertCircle className="w-5 h-5 flex-shrink-0" />
-        <span>{error}</span>
-      </div>
-    );
-  }
+  if (isLoading) return <LoadingBlock />;
+  if (error) return <ErrorBanner message={error} />;
 
   if (rows.length === 0) {
-    return (
-      <div className="py-12 text-center">
-        <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-100 rounded-full mb-3">
-          <Trophy className="w-6 h-6 text-indigo-600" />
-        </div>
-        <p className="text-gray-600">
-          No scores yet. Come back after the first gameweek settles.
-        </p>
-      </div>
-    );
+    return <EmptyBoard label="No scores yet. Come back after the first gameweek settles." />;
   }
 
   return (
-    <div className="space-y-3">
-      <div className="overflow-x-auto">
+    <div className="space-y-4">
+      <div className="overflow-x-auto rounded-xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/60">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs uppercase tracking-wider text-gray-500 border-b border-gray-200">
-              <th className="py-2 px-3 w-16">Rank</th>
-              <th className="py-2 px-3">User</th>
-              <th className="py-2 px-3 text-right">GW</th>
-              <th className="py-2 px-3 text-right">Points</th>
+            <tr className="text-left font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-300)] border-b border-[color:var(--color-ink-700)]">
+              <th className="py-3 px-4 w-16">Rank</th>
+              <th className="py-3 px-4">Manager</th>
+              <th className="py-3 px-4 text-right w-20 hidden sm:table-cell">GW</th>
+              <th className="py-3 px-4 text-right w-28">Points</th>
             </tr>
           </thead>
           <tbody>
@@ -284,33 +299,39 @@ function AllTimeView({
               return (
                 <tr
                   key={row.userId}
-                  className={`border-b border-gray-100 ${
-                    isCurrentUser ? 'bg-indigo-50' : ''
+                  className={`border-b border-[color:var(--color-ink-700)]/60 last:border-b-0 transition-colors ${
+                    isCurrentUser
+                      ? 'bg-[color:var(--color-volt-200)]/5'
+                      : 'hover:bg-[color:var(--color-ink-800)]/60'
                   }`}
                 >
-                  <td className="py-3 px-3 font-semibold text-gray-900">
-                    #{row.rank}
+                  <td className="py-3 px-4">
+                    <span
+                      className={`inline-flex items-center justify-center min-w-[2.25rem] px-2 py-1 rounded-md font-mono tabular-nums text-xs border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-900)]/80 ${rankTone(row.rank)}`}
+                    >
+                      {String(row.rank).padStart(2, '0')}
+                    </span>
                   </td>
-                  <td className="py-3 px-3">
+                  <td className="py-3 px-4">
                     <span
                       className={
                         isCurrentUser
-                          ? 'font-semibold text-indigo-700'
-                          : 'text-gray-900'
+                          ? 'font-semibold text-[color:var(--color-volt-200)]'
+                          : 'font-semibold text-[color:var(--color-ink-50)]'
                       }
                     >
                       {row.username}
                     </span>
                     {isCurrentUser && (
-                      <span className="ml-2 text-xs text-indigo-600 font-medium">
-                        (you)
+                      <span className="ml-2 font-mono text-[0.58rem] tracking-[0.22em] uppercase text-[color:var(--color-volt-200)]">
+                        · you
                       </span>
                     )}
                   </td>
-                  <td className="py-3 px-3 text-right text-gray-600">
+                  <td className="py-3 px-4 text-right font-mono tabular-nums text-[color:var(--color-ink-300)] hidden sm:table-cell">
                     {row.gameweeksPlayed}
                   </td>
-                  <td className="py-3 px-3 text-right font-semibold text-gray-900">
+                  <td className="py-3 px-4 text-right scoreboard text-base text-[color:var(--color-ink-50)]">
                     {row.totalPoints}
                   </td>
                 </tr>
@@ -321,9 +342,9 @@ function AllTimeView({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
-          <div className="text-xs text-gray-500">
-            Page {page + 1} of {totalPages}
+        <div className="flex items-center justify-between gap-3">
+          <div className="font-mono text-[0.65rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-400)]">
+            Page {String(page + 1).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -331,7 +352,7 @@ function AllTimeView({
               size="sm"
               onClick={onPrev}
               disabled={isFirst}
-              icon={<ChevronLeft className="w-4 h-4" />}
+              icon={<ChevronLeft />}
             >
               Prev
             </Button>
@@ -340,7 +361,8 @@ function AllTimeView({
               size="sm"
               onClick={onNext}
               disabled={isLast}
-              icon={<ChevronRight className="w-4 h-4" />}
+              icon={<ChevronRight />}
+              iconPosition="right"
             >
               Next
             </Button>
@@ -374,29 +396,11 @@ function GameweekView({
   error,
   currentUserId,
 }: GameweekViewProps) {
-  if (gameweeksLoading) {
-    return (
-      <div className="py-12 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
-      </div>
-    );
-  }
-
-  if (gameweeksError) {
-    return (
-      <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-        <AlertCircle className="w-5 h-5 flex-shrink-0" />
-        <span>{gameweeksError}</span>
-      </div>
-    );
-  }
+  if (gameweeksLoading) return <LoadingBlock />;
+  if (gameweeksError) return <ErrorBanner message={gameweeksError} />;
 
   if (gameweeks.length === 0) {
-    return (
-      <div className="py-12 text-center text-gray-600 text-sm">
-        No gameweeks available yet.
-      </div>
-    );
+    return <EmptyBoard label="No gameweeks available yet." />;
   }
 
   return (
@@ -404,7 +408,7 @@ function GameweekView({
       <div>
         <label
           htmlFor="gameweek-standings-round"
-          className="block text-xs font-medium text-gray-700 mb-1"
+          className="block text-[0.65rem] font-semibold tracking-[0.18em] uppercase text-[color:var(--color-ink-300)] mb-2"
         >
           Gameweek
         </label>
@@ -412,7 +416,7 @@ function GameweekView({
           id="gameweek-standings-round"
           value={selectedRound ?? ''}
           onChange={(event) => onSelectRound(event.target.value)}
-          className="block w-full sm:w-64 rounded-lg border border-gray-300 py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+          className="block w-full sm:w-72 rounded-lg border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-800)]/70 py-2.5 px-3 text-sm text-[color:var(--color-ink-50)] focus:outline-none focus:border-[color:var(--color-volt-200)]/70"
         >
           {gameweeks.map((gw) => (
             <option key={gw.round} value={gw.round}>
@@ -423,32 +427,20 @@ function GameweekView({
       </div>
 
       {isLoading ? (
-        <div className="py-12 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
-        </div>
+        <LoadingBlock />
       ) : error ? (
-        <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span>{error}</span>
-        </div>
+        <ErrorBanner message={error} />
       ) : !rows || rows.length === 0 ? (
-        <div className="py-12 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-100 rounded-full mb-3">
-            <Trophy className="w-6 h-6 text-indigo-600" />
-          </div>
-          <p className="text-gray-600">
-            No scores for this gameweek yet.
-          </p>
-        </div>
+        <EmptyBoard label="No scores for this gameweek yet." />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/60">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                <th className="py-2 px-3 w-16">Rank</th>
-                <th className="py-2 px-3">User</th>
-                <th className="py-2 px-3 text-right">Predictions</th>
-                <th className="py-2 px-3 text-right">Points</th>
+              <tr className="text-left font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-300)] border-b border-[color:var(--color-ink-700)]">
+                <th className="py-3 px-4 w-16">Rank</th>
+                <th className="py-3 px-4">Manager</th>
+                <th className="py-3 px-4 text-right w-24 hidden sm:table-cell">Picks</th>
+                <th className="py-3 px-4 text-right w-24">Points</th>
               </tr>
             </thead>
             <tbody>
@@ -458,33 +450,39 @@ function GameweekView({
                 return (
                   <tr
                     key={row.userId}
-                    className={`border-b border-gray-100 ${
-                      isCurrentUser ? 'bg-indigo-50' : ''
+                    className={`border-b border-[color:var(--color-ink-700)]/60 last:border-b-0 transition-colors ${
+                      isCurrentUser
+                        ? 'bg-[color:var(--color-volt-200)]/5'
+                        : 'hover:bg-[color:var(--color-ink-800)]/60'
                     }`}
                   >
-                    <td className="py-3 px-3 font-semibold text-gray-900">
-                      #{row.rank}
+                    <td className="py-3 px-4">
+                      <span
+                        className={`inline-flex items-center justify-center min-w-[2.25rem] px-2 py-1 rounded-md font-mono tabular-nums text-xs border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-900)]/80 ${rankTone(row.rank)}`}
+                      >
+                        {String(row.rank).padStart(2, '0')}
+                      </span>
                     </td>
-                    <td className="py-3 px-3">
+                    <td className="py-3 px-4">
                       <span
                         className={
                           isCurrentUser
-                            ? 'font-semibold text-indigo-700'
-                            : 'text-gray-900'
+                            ? 'font-semibold text-[color:var(--color-volt-200)]'
+                            : 'font-semibold text-[color:var(--color-ink-50)]'
                         }
                       >
                         {row.username}
                       </span>
                       {isCurrentUser && (
-                        <span className="ml-2 text-xs text-indigo-600 font-medium">
-                          (you)
+                        <span className="ml-2 font-mono text-[0.58rem] tracking-[0.22em] uppercase text-[color:var(--color-volt-200)]">
+                          · you
                         </span>
                       )}
                     </td>
-                    <td className="py-3 px-3 text-right text-gray-600">
+                    <td className="py-3 px-4 text-right font-mono tabular-nums text-[color:var(--color-ink-300)] hidden sm:table-cell">
                       {row.predictionsCount}
                     </td>
-                    <td className="py-3 px-3 text-right font-semibold text-gray-900">
+                    <td className="py-3 px-4 text-right scoreboard text-base text-[color:var(--color-ink-50)]">
                       {row.gameweekPoints}
                     </td>
                   </tr>

@@ -26,4 +26,7 @@ public class PredictionScorer {
     @Id
     @Column(name = "player_id")
     private Long playerId;
+
+    @Column(name = "count", nullable = false)
+    private int count;
 }

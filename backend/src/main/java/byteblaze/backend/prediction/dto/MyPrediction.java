@@ -7,7 +7,7 @@ public record MyPrediction(
         boolean predictedDraw,
         Integer homeScore,
         Integer awayScore,
-        List<Long> scorerPlayerIds,
-        List<Long> assisterPlayerIds
+        List<PlayerPick> scorers,
+        List<PlayerPick> assisters
 ) {
 }

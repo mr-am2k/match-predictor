@@ -37,23 +37,28 @@ export function StepCompetition({ competitionId, onChange }: StepCompetitionProp
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-up">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Pick a competition</h2>
-        <p className="text-gray-600 mt-1">
-          Your league will run for the selected competition's current season.
+        <p className="font-mono text-[0.68rem] tracking-[0.3em] uppercase text-[color:var(--color-volt-200)] mb-3">
+          / Step 03 — Fixture list
+        </p>
+        <h2 className="font-display text-4xl sm:text-5xl tracking-wide text-[color:var(--color-ink-50)]">
+          Pick a competition.
+        </h2>
+        <p className="mt-3 text-[color:var(--color-ink-200)] max-w-xl">
+          Your league runs for the selected competition's current season. Every fixture is in play.
         </p>
       </div>
 
       {isLoading && (
-        <div className="flex items-center justify-center py-16 text-gray-500">
-          <Loader2 className="w-6 h-6 animate-spin" />
+        <div className="flex items-center justify-center py-16 text-[color:var(--color-ink-300)]">
+          <Loader2 className="w-6 h-6 animate-spin text-[color:var(--color-volt-200)]" />
         </div>
       )}
 
       {error && !isLoading && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+        <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8 text-[color:var(--color-loss-500)] text-sm">
+          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}

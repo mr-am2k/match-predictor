@@ -1,1 +1,342 @@
 @import "tailwindcss";
+
+/* ============================================================
+   STADIUM BRUTALIST — Match Predictor Design System
+   Editorial sports meets premium data product.
+   (Fonts loaded via <link> tags in index.html)
+   ============================================================ */
+
+@theme {
+  /* Canvas */
+  --color-ink-950: #05070A;
+  --color-ink-900: #0A0D12;
+  --color-ink-850: #10141B;
+  --color-ink-800: #171C26;
+  --color-ink-750: #1F2531;
+  --color-ink-700: #252C3B;
+  --color-ink-600: #313A4D;
+  --color-ink-500: #3F4A61;
+  --color-ink-400: #5F6A7E;
+  --color-ink-300: #8791A5;
+  --color-ink-200: #9AA4B8;
+  --color-ink-100: #C6CCD9;
+  --color-ink-50: #E7EAF0;
+  --color-ink-0: #F8F9FC;
+
+  /* Signature electric chartreuse — our one sharp accent */
+  --color-volt-50:  #F2FFCF;
+  --color-volt-100: #E3FF99;
+  --color-volt-200: #D7FF3D;
+  --color-volt-300: #B8E22E;
+  --color-volt-400: #98BC24;
+  --color-volt-500: #748F1C;
+
+  /* Outcome colors (semantic) */
+  --color-win-500:  #34D399;
+  --color-win-600:  #10B981;
+  --color-draw-500: #F5B445;
+  --color-loss-500: #FF5C5C;
+  --color-loss-600: #DC3A3A;
+
+  /* Type families */
+  --font-display: 'Bebas Neue', 'Oswald', sans-serif;
+  --font-sans: 'Satoshi', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  color-scheme: dark;
+  --grain-opacity: 0.04;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--color-ink-900);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink-50);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01", "ss02", "cv01", "cv11";
+  text-rendering: optimizeLegibility;
+}
+
+/* ------- Atmospheric body background ------- */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(1200px 800px at 85% -10%, rgba(215, 255, 61, 0.08), transparent 55%),
+    radial-gradient(900px 600px at 0% 100%, rgba(64, 120, 200, 0.10), transparent 55%),
+    linear-gradient(180deg, #0A0D12 0%, #080A0F 100%);
+}
+
+/* Subtle grain overlay — adds physicality to the dark theme */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.3 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ------- Typographic defaults ------- */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  line-height: 0.9;
+}
+
+.font-mono, code, kbd, pre, samp {
+  font-family: var(--font-mono);
+  font-feature-settings: "zero";
+}
+
+::selection {
+  background: var(--color-volt-200);
+  color: var(--color-ink-950);
+}
+
+/* ------- Scrollbar ------- */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-700);
+  border-radius: 0;
+  border: 2px solid var(--color-ink-900);
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--color-ink-600); }
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-700) transparent;
+}
+
+/* ------- Focus ring (single source of truth) ------- */
+:focus-visible {
+  outline: 2px solid var(--color-volt-200);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+input:focus, select:focus, textarea:focus, button:focus {
+  outline: none;
+}
+
+/* ------- Reusable design primitives ------- */
+
+/* Subtle pitch-line border — evokes stadium markings */
+.pitch-border {
+  position: relative;
+  background: var(--color-ink-850);
+  border: 1px solid var(--color-ink-700);
+}
+.pitch-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, transparent calc(50% - 0.5px), rgba(215,255,61,0.04) calc(50% - 0.5px), rgba(215,255,61,0.04) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+}
+
+/* Glow accent — used sparingly on hero elements */
+.volt-glow {
+  box-shadow:
+    0 0 0 1px rgba(215, 255, 61, 0.25),
+    0 0 40px -10px rgba(215, 255, 61, 0.55),
+    0 0 80px -20px rgba(215, 255, 61, 0.35);
+}
+
+.volt-glow-sm {
+  box-shadow:
+    0 0 0 1px rgba(215, 255, 61, 0.25),
+    0 0 20px -6px rgba(215, 255, 61, 0.45);
+}
+
+/* Surface — general card background */
+.surface {
+  background: color-mix(in srgb, var(--color-ink-850) 92%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--color-ink-700);
+}
+
+.surface-raised {
+  background: color-mix(in srgb, var(--color-ink-800) 92%, transparent);
+  border: 1px solid var(--color-ink-700);
+}
+
+/* Chip / pill */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--color-ink-700);
+  background: color-mix(in srgb, var(--color-ink-800) 70%, transparent);
+  color: var(--color-ink-100);
+}
+
+.chip-volt {
+  color: var(--color-volt-200);
+  background: color-mix(in srgb, var(--color-volt-200) 10%, transparent);
+  border-color: color-mix(in srgb, var(--color-volt-200) 35%, transparent);
+}
+
+.chip-win {
+  color: var(--color-win-500);
+  background: color-mix(in srgb, var(--color-win-500) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-win-500) 35%, transparent);
+}
+
+.chip-draw {
+  color: var(--color-draw-500);
+  background: color-mix(in srgb, var(--color-draw-500) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-draw-500) 35%, transparent);
+}
+
+.chip-loss {
+  color: var(--color-loss-500);
+  background: color-mix(in srgb, var(--color-loss-500) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-loss-500) 35%, transparent);
+}
+
+/* Hatch pattern — decorative sports stripe */
+.hatch {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(215, 255, 61, 0.08),
+    rgba(215, 255, 61, 0.08) 2px,
+    transparent 2px,
+    transparent 10px
+  );
+}
+
+/* Scoreboard number — big mono readouts */
+.scoreboard {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Tick marks — stadium scoreboard vibe */
+.tick-divider {
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--color-ink-700) 0 1px,
+    transparent 1px 8px
+  );
+  height: 1px;
+}
+
+/* Stadium mesh — used as background texture on hero cards */
+.stadium-mesh {
+  background-image:
+    linear-gradient(to right, rgba(215, 255, 61, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(215, 255, 61, 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes voltPulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.animate-fade-up { animation: fadeUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.animate-fade-in { animation: fadeIn 0.6s ease-out both; }
+.animate-volt-pulse { animation: voltPulse 2.4s ease-in-out infinite; }
+.animate-marquee { animation: marquee 40s linear infinite; }
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-ink-800) 0%,
+    var(--color-ink-750) 50%,
+    var(--color-ink-800) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Stagger helper: add .stagger > child:nth-child(n) animations */
+.stagger > * { animation: fadeUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger > *:nth-child(2) { animation-delay: 0.12s; }
+.stagger > *:nth-child(3) { animation-delay: 0.19s; }
+.stagger > *:nth-child(4) { animation-delay: 0.26s; }
+.stagger > *:nth-child(5) { animation-delay: 0.33s; }
+.stagger > *:nth-child(6) { animation-delay: 0.40s; }
+.stagger > *:nth-child(7) { animation-delay: 0.47s; }
+.stagger > *:nth-child(8) { animation-delay: 0.54s; }
+
+/* Form controls — consistent dark styling for native elements */
+input, select, textarea {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85) hue-rotate(40deg);
+  cursor: pointer;
+}
+
+/* Disable blue Chrome autofill */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-ink-800) inset;
+  -webkit-text-fill-color: var(--color-ink-50);
+  caret-color: var(--color-ink-50);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

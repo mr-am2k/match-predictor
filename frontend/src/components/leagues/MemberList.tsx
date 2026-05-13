@@ -48,54 +48,57 @@ export function MemberList({ leagueId }: MemberListProps) {
 
   if (isLoading) {
     return (
-      <div className="py-6 flex items-center justify-center">
-        <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+      <div className="py-8 flex items-center justify-center">
+        <Loader2 className="w-5 h-5 text-[color:var(--color-volt-200)] animate-spin" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+      <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-loss-500)]/40 bg-[color:var(--color-loss-500)]/8 text-[color:var(--color-loss-500)] text-sm">
+        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
         <span>{error}</span>
       </div>
     );
   }
 
   if (members.length === 0) {
-    return <p className="text-sm text-gray-500">No members yet.</p>;
+    return (
+      <p className="text-sm text-[color:var(--color-ink-300)]">No members yet.</p>
+    );
   }
 
   return (
-    <ul className="divide-y divide-gray-100">
-      {members.map((member) => (
+    <ul className="space-y-1.5 stagger">
+      {members.map((member, idx) => (
         <li
           key={member.userId}
-          className="py-3 flex items-center justify-between gap-3"
+          className="group flex items-center justify-between gap-3 p-3 rounded-lg border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-800)]/60 hover:bg-[color:var(--color-ink-800)] hover:border-[color:var(--color-ink-600)] transition-colors"
         >
           <div className="min-w-0 flex items-center gap-3">
-            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-sm font-semibold text-indigo-600">
-                {member.username.charAt(0).toUpperCase()}
-              </span>
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[color:var(--color-volt-200)] to-[color:var(--color-volt-300)] text-[color:var(--color-ink-950)] grid place-items-center flex-shrink-0 font-bold text-sm">
+              {member.username.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <div className="font-medium text-gray-900 truncate">{member.username}</div>
-              <div className="text-xs text-gray-500">
+              <div className="font-semibold text-[color:var(--color-ink-50)] truncate">
+                {member.username}
+              </div>
+              <div className="font-mono text-[0.62rem] tracking-[0.2em] uppercase text-[color:var(--color-ink-400)] mt-0.5">
                 Joined {formatJoinedDate(member.joinedAt)}
               </div>
             </div>
           </div>
-          <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
-              member.role === 'OWNER'
-                ? 'bg-amber-100 text-amber-700'
-                : 'bg-gray-100 text-gray-700'
-            }`}
-          >
-            {member.role}
-          </span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="font-mono tabular-nums text-xs text-[color:var(--color-ink-400)] hidden sm:inline">
+              {String(idx + 1).padStart(2, '0')}
+            </span>
+            <span
+              className={`chip ${member.role === 'OWNER' ? 'chip-volt' : ''}`}
+            >
+              {member.role}
+            </span>
+          </div>
         </li>
       ))}
     </ul>
