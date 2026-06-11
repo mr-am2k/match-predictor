@@ -179,7 +179,9 @@ public class LeagueOverallPredictionServiceImpl implements LeagueOverallPredicti
             return false;
         }
         LocalDate today = LocalDate.now();
-        return today.isAfter(locksAt) || today.isEqual(locksAt);
+
+        // Predictions stay open on the day the league/season starts; they lock once that day has passed.
+        return today.isAfter(locksAt);
     }
 
     private Set<Long> collectTeamIds(Long competitionId, Integer seasonYear) {
