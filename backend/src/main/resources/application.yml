@@ -27,7 +27,7 @@ api:
     base-url: ${FOOTBALL_API_URL}
     api-key: ${FOOTBALL_API_KEY}
     whitelisted-ids: 1,2,3,39,61,78,135,140,94,88
-    daily-call-limit: 100
+    daily-call-limit: ${FOOTBALL_API_DAILY_LIMIT:5000}
 
 sync:
   scheduler:
