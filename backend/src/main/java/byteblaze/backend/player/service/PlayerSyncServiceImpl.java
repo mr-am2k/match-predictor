@@ -10,13 +10,13 @@ import byteblaze.backend.player.repository.TeamPlayerRepository;
 import byteblaze.backend.sync.budget.ApiCallBudget;
 import byteblaze.backend.sync.client.ApiFootballClient;
 import byteblaze.backend.sync.client.dto.SquadResponse;
+import byteblaze.backend.sync.client.dto.TeamsResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -158,6 +158,21 @@ public class PlayerSyncServiceImpl implements PlayerSyncService {
     private Set<Long> collectKnownTeamIds(Long competitionId, Integer seasonYear) {
         Set<Long> teamIds = new LinkedHashSet<>();
 
+        // Authoritative roster: the competition's team feed. This decouples squad
+        // discovery from fixture completeness — every participating team is synced
+        // even if we don't yet hold all of its fixtures. The global teams table
+        // can't be used here: it has no competition/season link, so it would mix
+        // in teams from every other competition. Budget-gated; on a miss we fall
+        // back to the teams we can derive locally below.
+        Optional<TeamsResponse> teams = client.fetchTeams(competitionId, seasonYear);
+        if (teams.isPresent() && teams.get().response() != null) {
+            for (TeamsResponse.TeamRow row : teams.get().response()) {
+                if (row != null && row.team() != null && row.team().id() != null) {
+                    teamIds.add(row.team().id());
+                }
+            }
+        }
+
         List<TeamPlayer> existing = teamPlayerRepository
                 .findAllByCompetitionIdAndSeasonYearAndRemovedAtIsNull(competitionId, seasonYear);
         for (TeamPlayer tp : existing) {
@@ -175,6 +190,6 @@ public class PlayerSyncServiceImpl implements PlayerSyncService {
             }
         }
 
-        return new LinkedHashSet<>(new ArrayList<>(teamIds));
+        return teamIds;
     }
 }
