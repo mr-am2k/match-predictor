@@ -49,11 +49,11 @@ public class ApiFootballClient {
                 "live=all league=" + competitionId);
     }
 
-    public Optional<FixturesResponse> fetchUpcomingFixtures(long competitionId, int seasonYear) {
-        String uri = String.format("%s?league=%d&season=%d&next=20",
+    public Optional<FixturesResponse> fetchSeasonFixtures(long competitionId, int seasonYear) {
+        String uri = String.format("%s?league=%d&season=%d",
                 ENDPOINT_FIXTURES, competitionId, seasonYear);
         return execute(ENDPOINT_FIXTURES, competitionId, uri, FixturesResponse.class,
-                "next=20 league=" + competitionId);
+                "season league=" + competitionId);
     }
 
     public Optional<FixturesResponse> fetchFixturesForDate(long competitionId, int seasonYear, LocalDate date) {
