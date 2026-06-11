@@ -109,7 +109,12 @@ public class FixtureSyncServiceImpl implements FixtureSyncService {
         final Integer season = competition.getSeasonYear();
         log.info("syncUpcoming: competition={} season={}", competitionId, season);
 
-        final Optional<FixturesResponse> response = client.fetchUpcomingFixtures(competitionId, season);
+        // Fetch the full season's fixtures (not just the next N). A tournament
+        // can have more fixtures than any small window would cover, and team
+        // discovery for squad sync derives teams from the fixtures we hold, so
+        // an incomplete fixture set silently drops whole teams (and therefore
+        // their players) from predictions. One call per competition either way.
+        final Optional<FixturesResponse> response = client.fetchSeasonFixtures(competitionId, season);
 
         if (response.isEmpty() || response.get().response() == null) {
             log.info("syncUpcoming: no response for competition={} (budget or error)", competitionId);
