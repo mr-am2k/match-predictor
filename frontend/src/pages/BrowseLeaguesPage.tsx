@@ -222,7 +222,7 @@ export function BrowseLeaguesPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setPage((p) => p + 1)}
-                  disabled={data.page.number >= data.page.totalPages - 1}
+                  disabled={data.page.number >= data?.page?.totalPages - 1}
                   icon={<ChevronRight />}
                   iconPosition="right"
                 >

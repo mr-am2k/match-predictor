@@ -1,6 +1,7 @@
 package byteblaze.backend.prediction.service;
 
 import byteblaze.backend.auth.entity.User;
+import byteblaze.backend.prediction.dto.FixturePredictionsResponse;
 import byteblaze.backend.prediction.dto.GameweekFixturesResponse;
 import byteblaze.backend.prediction.dto.GameweekSummaryResponse;
 import byteblaze.backend.prediction.dto.MyPrediction;
@@ -16,4 +17,6 @@ public interface PredictionService {
     GameweekFixturesResponse getGameweekFixtures(UUID leagueId, String round, User currentUser);
 
     MyPrediction upsertPrediction(UUID leagueId, Long fixtureId, UpsertPredictionRequest req, User currentUser);
+
+    FixturePredictionsResponse getFixturePredictions(UUID leagueId, Long fixtureId, User currentUser);
 }

@@ -27,7 +27,8 @@ public interface LeagueRepository extends JpaRepository<League, UUID> {
             WHERE l.visibility = byteblaze.backend.league.entity.LeagueVisibility.PUBLIC
               AND l.archived = false
               AND (:competitionId IS NULL OR l.competition.id = :competitionId)
-              AND (:search IS NULL OR LOWER(l.name) LIKE CONCAT('%', :search, '%'))
+              AND (CAST(:search AS string) IS NULL
+                   OR LOWER(l.name) LIKE CONCAT('%', CAST(:search AS string), '%'))
             """)
     Page<League> findPublicLeagues(
             @Param("competitionId") Long competitionId,
@@ -37,7 +38,8 @@ public interface LeagueRepository extends JpaRepository<League, UUID> {
 
     @Query("""
             SELECT l FROM League l
-            WHERE (:search IS NULL OR LOWER(l.name) LIKE CONCAT('%', :search, '%'))
+            WHERE (CAST(:search AS string) IS NULL
+                   OR LOWER(l.name) LIKE CONCAT('%', CAST(:search AS string), '%'))
               AND (:archived IS NULL OR l.archived = :archived)
             """)
     Page<League> findAdminLeagues(

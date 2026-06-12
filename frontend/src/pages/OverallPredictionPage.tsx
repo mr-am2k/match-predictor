@@ -236,7 +236,7 @@ export function OverallPredictionPage() {
                   Lock deadline
                 </p>
                 <p className="text-sm text-[color:var(--color-ink-100)] mt-1">
-                  Picks lock on season start
+                  Picks lock 3 days after the season starts
                   {prediction.locksAt ? ` (${formatLockDate(prediction.locksAt)})` : ''}.
                 </p>
               </div>
@@ -252,7 +252,7 @@ export function OverallPredictionPage() {
               <div>
                 <p className="font-display text-xl tracking-wide">PICKS LOCKED</p>
                 <p className="text-sm mt-1 text-[color:var(--color-loss-500)]/90">
-                  Closed when the season started
+                  Closed 3 days after the season started
                   {prediction.locksAt ? ` on ${formatLockDate(prediction.locksAt)}` : ''}.
                   They'll score when the season ends.
                 </p>

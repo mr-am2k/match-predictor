@@ -1,4 +1,4 @@
-import { Pencil } from 'lucide-react';
+import { Eye, Lock, Pencil } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button } from '../ui/Button';
 import type {
@@ -6,10 +6,12 @@ import type {
   PlayerPick,
 } from '../../types/prediction';
 import { LockCountdown } from './LockCountdown';
+import { PointsBreakdown } from './PointsBreakdown';
 
 interface MatchPredictionCardProps {
   fixture: FixtureWithPrediction;
   onEdit: () => void;
+  onReveal: () => void;
 }
 
 const FINAL_STATUSES = new Set(['FT', 'AET', 'PEN']);
@@ -93,6 +95,7 @@ function TeamCrest({ name, logoUrl }: { name: string; logoUrl: string | null }) 
 export function MatchPredictionCard({
   fixture,
   onEdit,
+  onReveal,
 }: MatchPredictionCardProps) {
   const isFinal = FINAL_STATUSES.has(fixture.status);
   const showActualScore =
@@ -132,6 +135,7 @@ export function MatchPredictionCard({
   const predHome = p?.homeScore;
   const predAway = p?.awayScore;
   const hasScore = p != null && predHome != null && predAway != null;
+  const points = p?.points ?? null;
 
   return (
     <article
@@ -258,8 +262,13 @@ export function MatchPredictionCard({
           </div>
         </div>
 
-        {/* Extra pick detail (scorers / assisters) */}
-        {hasPrediction &&
+        {/* Settled: full points ledger. Otherwise: plain pick list. */}
+        {isFinal && p?.breakdown ? (
+          <div className="mt-5">
+            <PointsBreakdown breakdown={p.breakdown} />
+          </div>
+        ) : (
+          hasPrediction &&
           p &&
           (p.scorers.length > 0 || p.assisters.length > 0) && (
             <div className="mt-5 pt-4 border-t border-dashed border-[color:var(--color-ink-700)] space-y-1.5">
@@ -284,7 +293,8 @@ export function MatchPredictionCard({
                 </p>
               )}
             </div>
-          )}
+          )
+        )}
       </div>
 
       <div className="tick-divider mx-4 sm:mx-6" />
@@ -306,18 +316,42 @@ export function MatchPredictionCard({
               </span>
             </span>
           )}
+          {points != null && (
+            <span className={points > 0 ? 'chip chip-win' : 'chip'}>
+              <span className="font-mono tabular-nums">
+                {points > 0 ? `+${points}` : points} pts
+              </span>
+            </span>
+          )}
         </div>
-        {!isFinal && (
+        <div className="flex items-center gap-2">
+          {/* Reveal everyone's picks — unlocks the moment the fixture locks. */}
           <Button
             size="sm"
-            variant={hasPrediction ? 'outline' : 'primary'}
-            onClick={onEdit}
-            disabled={locked}
-            icon={<Pencil className="w-4 h-4" />}
+            variant="outline"
+            onClick={onReveal}
+            disabled={!locked}
+            icon={
+              locked ? (
+                <Eye className="w-4 h-4" />
+              ) : (
+                <Lock className="w-4 h-4" />
+              )
+            }
           >
-            {hasPrediction ? 'Edit' : 'Predict'}
+            {locked ? 'See picks' : 'Picks at lock'}
           </Button>
-        )}
+          {!isFinal && !locked && (
+            <Button
+              size="sm"
+              variant={hasPrediction ? 'outline' : 'primary'}
+              onClick={onEdit}
+              icon={<Pencil className="w-4 h-4" />}
+            >
+              {hasPrediction ? 'Edit' : 'Predict'}
+            </Button>
+          )}
+        </div>
       </div>
     </article>
   );

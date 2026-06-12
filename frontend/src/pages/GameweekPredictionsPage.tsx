@@ -7,6 +7,7 @@ import { GameweekPicker } from '../components/predictions/GameweekPicker';
 import { LockCountdown } from '../components/predictions/LockCountdown';
 import { MatchPredictionCard } from '../components/predictions/MatchPredictionCard';
 import { MatchPredictionModal } from '../components/predictions/MatchPredictionModal';
+import { PredictionsRevealModal } from '../components/predictions/PredictionsRevealModal';
 import { Button } from '../components/ui/Button';
 import type { League } from '../types/league';
 import type {
@@ -47,6 +48,7 @@ export function GameweekPredictionsPage() {
   const [fixturesLoading, setFixturesLoading] = useState(false);
 
   const [editingFixtureId, setEditingFixtureId] = useState<number | null>(null);
+  const [revealFixtureId, setRevealFixtureId] = useState<number | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -123,6 +125,11 @@ export function GameweekPredictionsPage() {
     if (!fixturesData || editingFixtureId == null) return null;
     return fixturesData.fixtures.find((f) => f.id === editingFixtureId) ?? null;
   }, [fixturesData, editingFixtureId]);
+
+  const revealFixture: FixtureWithPrediction | null = useMemo(() => {
+    if (!fixturesData || revealFixtureId == null) return null;
+    return fixturesData.fixtures.find((f) => f.id === revealFixtureId) ?? null;
+  }, [fixturesData, revealFixtureId]);
 
   const handlePredictionSaved = useCallback(
     (updated: MyPrediction) => {
@@ -288,6 +295,7 @@ export function GameweekPredictionsPage() {
                         key={fixture.id}
                         fixture={fixture}
                         onEdit={() => setEditingFixtureId(fixture.id)}
+                        onReveal={() => setRevealFixtureId(fixture.id)}
                       />
                     ))}
                   </div>
@@ -305,6 +313,15 @@ export function GameweekPredictionsPage() {
           open={true}
           onClose={() => setEditingFixtureId(null)}
           onSaved={handlePredictionSaved}
+        />
+      )}
+
+      {revealFixture && (
+        <PredictionsRevealModal
+          fixture={revealFixture}
+          leagueId={id}
+          open={true}
+          onClose={() => setRevealFixtureId(null)}
         />
       )}
     </div>
