@@ -1,4 +1,5 @@
 import type { GameweekFixtures, GameweekSummary } from '../types/prediction';
+import { apiFetch } from './http';
 
 const API_BASE = '/api/v1/leagues';
 
@@ -11,9 +12,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export async function listGameweeks(leagueId: string): Promise<GameweekSummary[]> {
-  const response = await fetch(`${API_BASE}/${leagueId}/gameweeks`, {
-    credentials: 'include',
-  });
+  const response = await apiFetch(`${API_BASE}/${leagueId}/gameweeks`);
   return handleResponse<GameweekSummary[]>(response);
 }
 
@@ -22,11 +21,8 @@ export async function getGameweekFixtures(
   round: string
 ): Promise<GameweekFixtures> {
   const encodedRound = encodeURIComponent(round);
-  const response = await fetch(
-    `${API_BASE}/${leagueId}/gameweeks/${encodedRound}/fixtures`,
-    {
-      credentials: 'include',
-    }
+  const response = await apiFetch(
+    `${API_BASE}/${leagueId}/gameweeks/${encodedRound}/fixtures`
   );
   return handleResponse<GameweekFixtures>(response);
 }
