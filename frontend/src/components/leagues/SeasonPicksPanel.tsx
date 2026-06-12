@@ -100,7 +100,7 @@ export function SeasonPicksPanel({ leagueId }: SeasonPicksPanelProps) {
               Call the season
             </h2>
             <p className="text-sm text-[color:var(--color-ink-200)] mt-1 max-w-lg">
-              Pick the competition winner, top goalscorer, and top assister before the season starts.
+              Pick the competition winner, top goalscorer, and top assister. Picks lock 3 days after the season starts.
             </p>
           </div>
         </div>
@@ -124,7 +124,7 @@ export function SeasonPicksPanel({ leagueId }: SeasonPicksPanelProps) {
                   <p className="font-mono text-[0.62rem] tracking-[0.22em] uppercase text-[color:var(--color-loss-500)] mb-1">
                     Picks locked
                   </p>
-                  Closed when the season started
+                  Closed 3 days after the season started
                   {prediction.locksAt ? ` on ${formatLockDate(prediction.locksAt)}` : ''}. Season picks
                   will score when the season ends.
                 </div>

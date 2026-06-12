@@ -1,6 +1,7 @@
 package byteblaze.backend.prediction.service;
 
 import byteblaze.backend.auth.entity.User;
+import byteblaze.backend.auth.repository.UserRepository;
 import byteblaze.backend.fixture.entity.Fixture;
 import byteblaze.backend.fixture.repository.FixtureRepository;
 import byteblaze.backend.league.entity.League;
@@ -11,16 +12,22 @@ import byteblaze.backend.player.entity.Player;
 import byteblaze.backend.player.entity.TeamPlayer;
 import byteblaze.backend.player.repository.PlayerRepository;
 import byteblaze.backend.player.repository.TeamPlayerRepository;
+import byteblaze.backend.prediction.dto.FixturePredictionsResponse;
 import byteblaze.backend.prediction.dto.FixtureWithPrediction;
 import byteblaze.backend.prediction.dto.GameweekFixturesResponse;
 import byteblaze.backend.prediction.dto.GameweekSummaryResponse;
 import byteblaze.backend.prediction.dto.MyPrediction;
+import byteblaze.backend.prediction.dto.OtherPrediction;
 import byteblaze.backend.prediction.dto.PlayerPick;
+import byteblaze.backend.prediction.dto.PlayerPickView;
 import byteblaze.backend.prediction.dto.PlayerSummary;
+import byteblaze.backend.prediction.dto.ScoreBreakdown;
+import byteblaze.backend.prediction.dto.ScoreLine;
 import byteblaze.backend.prediction.dto.TeamSummary;
 import byteblaze.backend.prediction.dto.UpsertPredictionRequest;
 import byteblaze.backend.prediction.entity.Prediction;
 import byteblaze.backend.prediction.entity.PredictionAssister;
+import byteblaze.backend.prediction.entity.PredictionScore;
 import byteblaze.backend.prediction.entity.PredictionScorer;
 import byteblaze.backend.prediction.exception.FixtureLockedException;
 import byteblaze.backend.prediction.exception.FixtureNotFoundException;
@@ -29,6 +36,7 @@ import byteblaze.backend.prediction.exception.NotALeagueMemberException;
 import byteblaze.backend.prediction.exception.PredictionValidationException;
 import byteblaze.backend.prediction.repository.PredictionAssisterRepository;
 import byteblaze.backend.prediction.repository.PredictionRepository;
+import byteblaze.backend.prediction.repository.PredictionScoreRepository;
 import byteblaze.backend.prediction.repository.PredictionScorerRepository;
 import byteblaze.backend.team.entity.Team;
 import byteblaze.backend.team.repository.TeamRepository;
@@ -36,6 +44,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.OffsetDateTime;
 import java.util.Comparator;
@@ -60,12 +70,15 @@ public class PredictionServiceImpl implements PredictionService {
     private final PredictionRepository predictionRepository;
     private final PredictionScorerRepository predictionScorerRepository;
     private final PredictionAssisterRepository predictionAssisterRepository;
+    private final PredictionScoreRepository predictionScoreRepository;
+    private final UserRepository userRepository;
     private final FixtureRepository fixtureRepository;
     private final LeagueRepository leagueRepository;
     private final LeagueMembershipRepository membershipRepository;
     private final TeamRepository teamRepository;
     private final PlayerRepository playerRepository;
     private final TeamPlayerRepository teamPlayerRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     public List<GameweekSummaryResponse> listGameweeks(UUID leagueId, User currentUser) {
@@ -225,6 +238,14 @@ public class PredictionServiceImpl implements PredictionService {
             }
         }
 
+        // Scores (present only for settled fixtures) + player names for breakdown lines.
+        Map<UUID, PredictionScore> scoreByPredictionId = predictionIds.isEmpty()
+                ? Map.of()
+                : predictionScoreRepository.findAllByPredictionIdIn(predictionIds).stream()
+                        .collect(Collectors.toMap(PredictionScore::getPredictionId, s -> s));
+        Map<Long, String> playerNameById = new HashMap<>();
+        playersById.forEach((pid, player) -> playerNameById.put(pid, player.getName()));
+
         List<FixtureWithPrediction> out = new java.util.ArrayList<>(fixtures.size());
         for (Fixture f : fixtures) {
             Team homeTeam = f.getHomeTeamId() != null ? teamsById.get(f.getHomeTeamId()) : null;
@@ -251,13 +272,20 @@ public class PredictionServiceImpl implements PredictionService {
             Prediction prediction = predictionByFixtureId.get(f.getId());
             MyPrediction my = null;
             if (prediction != null) {
+                PredictionScore scoreRow = scoreByPredictionId.get(prediction.getId());
+                Integer points = scoreRow == null ? null : scoreRow.getPoints();
+                ScoreBreakdown breakdown = scoreRow == null
+                        ? null
+                        : parseBreakdown(scoreRow.getBreakdown(), playerNameById);
                 my = new MyPrediction(
                         prediction.getWinnerTeamId(),
                         prediction.isPredictedDraw(),
                         prediction.getHomeScore(),
                         prediction.getAwayScore(),
                         scorersByPredictionId.getOrDefault(prediction.getId(), List.of()),
-                        assistersByPredictionId.getOrDefault(prediction.getId(), List.of())
+                        assistersByPredictionId.getOrDefault(prediction.getId(), List.of()),
+                        points,
+                        breakdown
                 );
             }
 
@@ -291,6 +319,108 @@ public class PredictionServiceImpl implements PredictionService {
                 .allMatch(f -> !now.isBefore(f.getKickoffAt().minusMinutes(15)));
 
         return new GameweekFixturesResponse(round, responseLocksAt, responseLocked, out);
+    }
+
+    @Override
+    public FixturePredictionsResponse getFixturePredictions(UUID leagueId, Long fixtureId, User currentUser) {
+        League league = requireLeagueAndMembership(leagueId, currentUser);
+        Long competitionId = league.getCompetition().getId();
+        Integer seasonYear = league.getSeasonYear();
+
+        Fixture fixture = fixtureRepository.findById(fixtureId)
+                .orElseThrow(() -> new FixtureNotFoundException(fixtureId));
+        if (!competitionId.equals(fixture.getCompetitionId())
+                || !seasonYear.equals(fixture.getSeasonYear())) {
+            throw new FixtureNotInLeagueException(fixtureId, leagueId);
+        }
+
+        OffsetDateTime lockedAt = fixture.getKickoffAt().minusMinutes(15);
+        boolean locked = !OffsetDateTime.now().isBefore(lockedAt);
+
+        int memberCount = (int) membershipRepository.countByLeagueId(leagueId);
+
+        List<Prediction> predictions = predictionRepository
+                .findAllByLeagueIdAndFixtureId(leagueId, fixtureId);
+        int predictionCount = predictions.size();
+
+        // Predictions stay hidden until the fixture locks (kickoff - 15m). We still
+        // return the counts so the UI can tease how many members have already picked.
+        if (!locked || predictions.isEmpty()) {
+            return new FixturePredictionsResponse(
+                    fixtureId, locked, lockedAt, memberCount, predictionCount, List.of());
+        }
+
+        List<UUID> predictionIds = predictions.stream().map(Prediction::getId).toList();
+
+        Set<UUID> userIds = predictions.stream().map(Prediction::getUserId).collect(Collectors.toSet());
+        Map<UUID, String> usernameById = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getUsername));
+
+        Map<UUID, List<PredictionScorer>> scorersByPrediction = predictionScorerRepository
+                .findAllByPredictionIdIn(predictionIds).stream()
+                .collect(Collectors.groupingBy(PredictionScorer::getPredictionId));
+        Map<UUID, List<PredictionAssister>> assistersByPrediction = predictionAssisterRepository
+                .findAllByPredictionIdIn(predictionIds).stream()
+                .collect(Collectors.groupingBy(PredictionAssister::getPredictionId));
+
+        Set<Long> playerIds = new HashSet<>();
+        scorersByPrediction.values().forEach(list -> list.forEach(s -> playerIds.add(s.getPlayerId())));
+        assistersByPrediction.values().forEach(list -> list.forEach(a -> playerIds.add(a.getPlayerId())));
+        Map<Long, String> playerNameById = playerIds.isEmpty()
+                ? Map.of()
+                : playerRepository.findAllByIdIn(playerIds).stream()
+                        .collect(Collectors.toMap(Player::getId, Player::getName));
+
+        // scores present only once the prediction has been scored (fixture settled)
+        Map<UUID, PredictionScore> scoreByPrediction = predictionScoreRepository
+                .findAllByPredictionIdIn(predictionIds).stream()
+                .collect(Collectors.toMap(PredictionScore::getPredictionId, s -> s));
+
+        UUID currentUserId = currentUser.getId();
+        List<OtherPrediction> rows = new java.util.ArrayList<>(predictions.size());
+        for (Prediction p : predictions) {
+            List<PlayerPickView> scorers = scorersByPrediction.getOrDefault(p.getId(), List.of()).stream()
+                    .map(s -> new PlayerPickView(
+                            s.getPlayerId(),
+                            playerNameById.getOrDefault(s.getPlayerId(), "Player #" + s.getPlayerId()),
+                            s.getCount()))
+                    .toList();
+            List<PlayerPickView> assisters = assistersByPrediction.getOrDefault(p.getId(), List.of()).stream()
+                    .map(a -> new PlayerPickView(
+                            a.getPlayerId(),
+                            playerNameById.getOrDefault(a.getPlayerId(), "Player #" + a.getPlayerId()),
+                            a.getCount()))
+                    .toList();
+
+            PredictionScore scoreRow = scoreByPrediction.get(p.getId());
+            Integer points = scoreRow == null ? null : scoreRow.getPoints();
+            ScoreBreakdown breakdown = scoreRow == null
+                    ? null
+                    : parseBreakdown(scoreRow.getBreakdown(), playerNameById);
+
+            rows.add(new OtherPrediction(
+                    p.getUserId(),
+                    usernameById.getOrDefault(p.getUserId(), "Unknown"),
+                    p.getUserId().equals(currentUserId),
+                    p.getWinnerTeamId(),
+                    p.isPredictedDraw(),
+                    p.getHomeScore(),
+                    p.getAwayScore(),
+                    scorers,
+                    assisters,
+                    points,
+                    breakdown
+            ));
+        }
+
+        // Current user first, then points desc (unscored last), then username.
+        rows.sort(Comparator
+                .comparingInt((OtherPrediction o) -> o.isCurrentUser() ? 0 : 1)
+                .thenComparingInt(o -> o.points() == null ? Integer.MAX_VALUE : -o.points())
+                .thenComparing(o -> o.username() == null ? "" : o.username().toLowerCase()));
+
+        return new FixturePredictionsResponse(
+                fixtureId, true, lockedAt, memberCount, predictionCount, rows);
     }
 
     @Override
@@ -373,7 +503,9 @@ public class PredictionServiceImpl implements PredictionService {
                 prediction.getHomeScore(),
                 prediction.getAwayScore(),
                 scorers,
-                assisters
+                assisters,
+                null,
+                null
         );
     }
 
@@ -555,5 +687,54 @@ public class PredictionServiceImpl implements PredictionService {
 
     private static boolean hasDuplicatePlayerIds(List<PlayerPick> picks) {
         return picks.stream().map(PlayerPick::playerId).distinct().count() != picks.size();
+    }
+
+    /**
+     * Parse the stored {@code prediction_scores.breakdown} JSON into a typed,
+     * name-resolved {@link ScoreBreakdown}. Returns null for breakdowns without a
+     * {@code total} field (cancelled/skipped fixtures or serialization failures).
+     */
+    private ScoreBreakdown parseBreakdown(String json, Map<Long, String> nameById) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            if (!root.has("total")) {
+                return null;
+            }
+            return new ScoreBreakdown(
+                    root.path("winner").asInt(0),
+                    root.path("score").asInt(0),
+                    parseScoreLines(root.path("scorers"), nameById),
+                    parseScoreLines(root.path("assisters"), nameById),
+                    root.path("categoriesHit").asInt(0),
+                    root.path("baseTotal").asInt(0),
+                    root.path("multiplier").asDouble(1.0),
+                    root.path("total").asInt(0)
+            );
+        } catch (RuntimeException e) {
+            log.warn("Failed to parse scoring breakdown: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private static List<ScoreLine> parseScoreLines(JsonNode array, Map<Long, String> nameById) {
+        if (array == null || !array.isArray() || array.isEmpty()) {
+            return List.of();
+        }
+        List<ScoreLine> lines = new java.util.ArrayList<>(array.size());
+        for (JsonNode node : array) {
+            Long playerId = node.path("playerId").asLong();
+            lines.add(new ScoreLine(
+                    playerId,
+                    nameById.getOrDefault(playerId, "Player #" + playerId),
+                    node.path("predicted").asInt(0),
+                    node.path("actual").asInt(0),
+                    node.path("correct").asBoolean(false),
+                    node.path("points").asInt(0)
+            ));
+        }
+        return lines;
     }
 }

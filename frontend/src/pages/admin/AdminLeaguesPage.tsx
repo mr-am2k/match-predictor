@@ -133,7 +133,7 @@ export function AdminLeaguesPage() {
     }
   };
 
-  const totalElements = data?.page.totalElements ?? 0;
+  const totalElements = data?.page?.totalElements ?? 0;
 
   return (
     <div className="space-y-8">
@@ -244,7 +244,7 @@ export function AdminLeaguesPage() {
                 Page {data.page.number + 1}
                 <span className="text-[color:var(--color-ink-500)]">
                   {' '}
-                  / {Math.max(1, data.page.totalPages)}
+                  / {Math.max(1, data?.page?.totalPages)}
                 </span>
               </span>
             </div>
@@ -426,7 +426,7 @@ export function AdminLeaguesPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setPage((p) => p + 1)}
-                disabled={data.page.number >= data.page.totalPages - 1}
+                disabled={data.page.number >= data?.page?.totalPages - 1}
                 icon={<ChevronRight />}
                 iconPosition="right"
               >

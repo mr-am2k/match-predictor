@@ -22,6 +22,8 @@ public interface PredictionRepository extends JpaRepository<Prediction, UUID> {
 
     List<Prediction> findAllByLeagueIdAndFixtureIdIn(UUID leagueId, Collection<Long> fixtureIds);
 
+    List<Prediction> findAllByLeagueIdAndFixtureId(UUID leagueId, Long fixtureId);
+
     @Query("SELECT p.userId, SUM(s.points), COUNT(DISTINCT p.fixtureId) " +
             "FROM Prediction p JOIN PredictionScore s ON s.predictionId = p.id " +
             "WHERE p.leagueId = :lid " +

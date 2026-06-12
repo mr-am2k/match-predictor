@@ -1,4 +1,8 @@
-import type { MyPrediction, UpsertPredictionRequest } from '../types/prediction';
+import type {
+  FixturePredictions,
+  MyPrediction,
+  UpsertPredictionRequest,
+} from '../types/prediction';
 
 const API_BASE = '/api/v1/leagues';
 
@@ -31,4 +35,17 @@ export async function upsertPrediction(
     }
   );
   return handleResponse<MyPrediction>(response);
+}
+
+export async function getFixturePredictions(
+  leagueId: string,
+  fixtureId: number
+): Promise<FixturePredictions> {
+  const response = await fetch(
+    `${API_BASE}/${leagueId}/fixtures/${fixtureId}/predictions`,
+    {
+      credentials: 'include',
+    }
+  );
+  return handleResponse<FixturePredictions>(response);
 }

@@ -1,6 +1,7 @@
 package byteblaze.backend.prediction.controller;
 
 import byteblaze.backend.auth.entity.User;
+import byteblaze.backend.prediction.dto.FixturePredictionsResponse;
 import byteblaze.backend.prediction.dto.GameweekFixturesResponse;
 import byteblaze.backend.prediction.dto.GameweekSummaryResponse;
 import byteblaze.backend.prediction.dto.MyPrediction;
@@ -41,6 +42,15 @@ public class PredictionController {
             @AuthenticationPrincipal User currentUser
     ) {
         return predictionService.getGameweekFixtures(leagueId, round, currentUser);
+    }
+
+    @GetMapping("/fixtures/{fixtureId}/predictions")
+    public FixturePredictionsResponse getFixturePredictions(
+            @PathVariable UUID leagueId,
+            @PathVariable Long fixtureId,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return predictionService.getFixturePredictions(leagueId, fixtureId, currentUser);
     }
 
     @PutMapping("/fixtures/{fixtureId}/prediction")

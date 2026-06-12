@@ -27,6 +27,26 @@ export interface PlayerPick {
   count: number;
 }
 
+export interface ScoreLine {
+  playerId: number;
+  name: string;
+  predicted: number;
+  actual: number;
+  correct: boolean;
+  points: number;
+}
+
+export interface ScoreBreakdown {
+  winnerPoints: number;
+  scorePoints: number;
+  scorers: ScoreLine[];
+  assisters: ScoreLine[];
+  categoriesHit: number;
+  baseTotal: number;
+  multiplier: number;
+  total: number;
+}
+
 export interface MyPrediction {
   winnerTeamId: number | null;
   predictedDraw: boolean;
@@ -34,6 +54,8 @@ export interface MyPrediction {
   awayScore: number | null;
   scorers: PlayerPick[];
   assisters: PlayerPick[];
+  points: number | null;
+  breakdown: ScoreBreakdown | null;
 }
 
 export interface FixtureWithPrediction {
@@ -65,4 +87,33 @@ export interface UpsertPredictionRequest {
   awayScore: number | null;
   scorers: PlayerPick[];
   assisters: PlayerPick[];
+}
+
+export interface PlayerPickView {
+  playerId: number;
+  name: string;
+  count: number;
+}
+
+export interface OtherPrediction {
+  userId: string;
+  username: string;
+  isCurrentUser: boolean;
+  winnerTeamId: number | null;
+  predictedDraw: boolean;
+  homeScore: number | null;
+  awayScore: number | null;
+  scorers: PlayerPickView[];
+  assisters: PlayerPickView[];
+  points: number | null;
+  breakdown: ScoreBreakdown | null;
+}
+
+export interface FixturePredictions {
+  fixtureId: number;
+  locked: boolean;
+  lockedAt: string | null;
+  memberCount: number;
+  predictionCount: number;
+  predictions: OtherPrediction[];
 }

@@ -50,6 +50,9 @@ public class LeagueOverallPredictionServiceImpl implements LeagueOverallPredicti
     private final PlayerRepository playerRepository;
     private final TeamPlayerRepository teamPlayerRepository;
 
+    /** Season picks stay open for a grace window after the season starts. */
+    private static final int LOCK_GRACE_DAYS = 3;
+
     @Override
     public OverallPredictionResponse get(UUID leagueId, User currentUser) {
         League league = requireLeagueAndMembership(leagueId, currentUser);
@@ -171,7 +174,11 @@ public class LeagueOverallPredictionServiceImpl implements LeagueOverallPredicti
 
     private LocalDate resolveLocksAt(League league) {
         Competition competition = league.getCompetition();
-        return competition == null ? null : competition.getSeasonStart();
+        if (competition == null || competition.getSeasonStart() == null) {
+            return null;
+        }
+        // Lock date is LOCK_GRACE_DAYS after the season starts.
+        return competition.getSeasonStart().plusDays(LOCK_GRACE_DAYS);
     }
 
     private boolean isLocked(LocalDate locksAt) {
@@ -180,7 +187,7 @@ public class LeagueOverallPredictionServiceImpl implements LeagueOverallPredicti
         }
         LocalDate today = LocalDate.now();
 
-        // Predictions stay open on the day the league/season starts; they lock once that day has passed.
+        // Predictions stay open through the lock date (3 days after season start); they lock once it has passed.
         return today.isAfter(locksAt);
     }
 

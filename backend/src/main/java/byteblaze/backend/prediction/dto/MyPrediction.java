@@ -8,6 +8,8 @@ public record MyPrediction(
         Integer homeScore,
         Integer awayScore,
         List<PlayerPick> scorers,
-        List<PlayerPick> assisters
+        List<PlayerPick> assisters,
+        Integer points,
+        ScoreBreakdown breakdown
 ) {
 }
