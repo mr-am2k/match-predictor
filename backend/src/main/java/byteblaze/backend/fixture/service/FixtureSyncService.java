@@ -16,4 +16,12 @@ public interface FixtureSyncService {
      * Only fixtures are upserted; no events fetched.
      */
     void syncUpcoming(Competition competition);
+
+    /**
+     * Score any fixture that is FINAL but has not yet been settled, regardless of
+     * which sync first marked it final. Fetches goal/assist events and publishes
+     * a {@code FixtureSettledEvent} per fixture. Self-healing and idempotent: a
+     * fixture is only picked up while {@code settled_at IS NULL}.
+     */
+    void settlePendingFixtures(Competition competition);
 }

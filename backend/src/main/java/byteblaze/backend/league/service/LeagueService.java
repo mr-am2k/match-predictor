@@ -7,6 +7,7 @@ import byteblaze.backend.league.dto.LeagueBrowseResponse;
 import byteblaze.backend.league.dto.LeagueMemberResponse;
 import byteblaze.backend.league.dto.LeagueResponse;
 import byteblaze.backend.league.dto.LeagueSummaryResponse;
+import byteblaze.backend.league.dto.LeagueSyncResponse;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
@@ -37,4 +38,6 @@ public interface LeagueService {
     List<LeagueMemberResponse> listMembers(UUID leagueId, User currentUser);
 
     LeagueResponse archive(UUID leagueId, boolean archived, User currentUser);
+
+    LeagueSyncResponse triggerSync(UUID leagueId, User currentUser);
 }

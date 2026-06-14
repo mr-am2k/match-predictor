@@ -39,6 +39,11 @@ public interface FixtureRepository extends JpaRepository<Fixture, Long> {
 
     long countByCompetitionIdAndSeasonYear(Long competitionId, Integer seasonYear);
 
+    long countByCompetitionIdAndStatusIn(Long competitionId, Collection<FixtureStatus> statuses);
+
+    List<Fixture> findByCompetitionIdAndSeasonYearAndStatusInAndSettledAtIsNull(
+            Long competitionId, Integer seasonYear, Collection<FixtureStatus> statuses);
+
     long countByCompetitionIdAndSeasonYearAndStatusIn(Long competitionId,
                                                       Integer seasonYear,
                                                       Collection<FixtureStatus> statuses);

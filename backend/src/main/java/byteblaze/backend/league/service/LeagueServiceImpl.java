@@ -13,6 +13,7 @@ import byteblaze.backend.league.dto.LeagueBrowseResponse;
 import byteblaze.backend.league.dto.LeagueMemberResponse;
 import byteblaze.backend.league.dto.LeagueResponse;
 import byteblaze.backend.league.dto.LeagueSummaryResponse;
+import byteblaze.backend.league.dto.LeagueSyncResponse;
 import byteblaze.backend.league.dto.OwnerSummary;
 import byteblaze.backend.league.entity.League;
 import byteblaze.backend.league.entity.LeagueMembership;
@@ -26,7 +27,10 @@ import byteblaze.backend.league.exception.LeagueNotFoundException;
 import byteblaze.backend.league.exception.LeagueNotPublicException;
 import byteblaze.backend.league.repository.LeagueMembershipRepository;
 import byteblaze.backend.league.repository.LeagueRepository;
+import byteblaze.backend.competition.exception.CompetitionNotFoundException;
 import byteblaze.backend.scoring.rules.service.LeagueScoringRulesService;
+import byteblaze.backend.sync.budget.ApiCallBudget;
+import byteblaze.backend.sync.orchestrator.SyncOrchestrator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -37,6 +41,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -44,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -52,12 +58,20 @@ public class LeagueServiceImpl implements LeagueService {
 
     private static final int MAX_JOIN_CODE_ATTEMPTS = 5;
 
+    /** Minimum gap between owner-triggered manual syncs for the same competition. */
+    private static final long MANUAL_SYNC_COOLDOWN_SECONDS = 60;
+
     private final LeagueRepository leagueRepository;
     private final LeagueMembershipRepository membershipRepository;
     private final CompetitionRepository competitionRepository;
     private final JoinCodeGenerator joinCodeGenerator;
     private final ApplicationEventPublisher eventPublisher;
     private final LeagueScoringRulesService scoringRulesService;
+    private final SyncOrchestrator syncOrchestrator;
+    private final ApiCallBudget budget;
+
+    /** Last manual-sync time per competition id; throttles the owner button. */
+    private final Map<Long, Instant> lastManualSyncByCompetition = new ConcurrentHashMap<>();
 
     @Override
     @Transactional
@@ -264,6 +278,52 @@ public class LeagueServiceImpl implements LeagueService {
         log.info("League archive={} set to {} by user={}", leagueId, archived, currentUser.getId());
 
         return buildLeagueResponse(league, currentUser);
+    }
+
+    @Override
+    public LeagueSyncResponse triggerSync(UUID leagueId, User currentUser) {
+        // Owner (or platform admin) only. Read the owner id directly to avoid
+        // pulling the whole League graph just for an authorization check.
+        final UUID ownerId = leagueRepository.findOwnerIdById(leagueId)
+                .orElseThrow(() -> new LeagueNotFoundException("League not found: " + leagueId));
+
+        boolean isOwner = ownerId.equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN;
+        if (!isOwner && !isAdmin) {
+            throw new LeagueAccessDeniedException("Only the league owner can trigger a sync");
+        }
+
+        final Long competitionId = leagueRepository.findCompetitionIdById(leagueId)
+                .orElseThrow(() -> new LeagueNotFoundException("League not found: " + leagueId));
+
+        // Throttle: many leagues share one competition, so cooldown by competition.
+        final Instant now = Instant.now();
+        final Instant last = lastManualSyncByCompetition.get(competitionId);
+        if (last != null && last.plusSeconds(MANUAL_SYNC_COOLDOWN_SECONDS).isAfter(now)) {
+            long retryIn = MANUAL_SYNC_COOLDOWN_SECONDS - (now.getEpochSecond() - last.getEpochSecond());
+            return new LeagueSyncResponse(
+                    false,
+                    "This competition was just synced. Try again in " + retryIn + "s.",
+                    budget.getUsedLast24h(),
+                    budget.getDailyLimit()
+            );
+        }
+
+        final Competition competition = competitionRepository.findById(competitionId)
+                .orElseThrow(() -> new CompetitionNotFoundException("Competition not found: " + competitionId));
+
+        lastManualSyncByCompetition.put(competitionId, now);
+        log.info("Owner-triggered sync: league={} competition={} by user={}",
+                leagueId, competitionId, currentUser.getId());
+
+        syncOrchestrator.refreshFixturesNow(competition);
+
+        return new LeagueSyncResponse(
+                true,
+                "Match data refreshed.",
+                budget.getUsedLast24h(),
+                budget.getDailyLimit()
+        );
     }
 
     private JoinResult joinLeague(League league, User currentUser) {
