@@ -136,28 +136,31 @@ function WinnerPill({
   onClick,
   children,
   tone = 'default',
+  disabled = false,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
   tone?: 'home' | 'away' | 'draw' | 'default';
+  disabled?: boolean;
 }) {
   const activeTone =
     tone === 'draw'
       ? 'bg-[color:var(--color-draw-500)]/15 border-[color:var(--color-draw-500)]/60 text-[color:var(--color-draw-500)]'
       : 'bg-[color:var(--color-volt-200)] border-[color:var(--color-volt-200)] text-[color:var(--color-ink-950)] shadow-[0_0_0_1px_rgba(215,255,61,0.35),0_8px_24px_-10px_rgba(215,255,61,0.55)]';
+  const inactive = disabled
+    ? 'bg-[color:var(--color-ink-850)]/70 border-[color:var(--color-ink-700)] text-[color:var(--color-ink-400)] opacity-60 cursor-default'
+    : 'bg-[color:var(--color-ink-850)]/70 border-[color:var(--color-ink-700)] text-[color:var(--color-ink-100)] hover:bg-[color:var(--color-ink-800)] hover:border-[color:var(--color-ink-500)]';
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={`
         flex-1 px-3 py-2.5 rounded-lg border text-sm font-semibold tracking-wide
         transition-[background-color,border-color,color,box-shadow] duration-150
-        ${
-          active
-            ? activeTone
-            : 'bg-[color:var(--color-ink-850)]/70 border-[color:var(--color-ink-700)] text-[color:var(--color-ink-100)] hover:bg-[color:var(--color-ink-800)] hover:border-[color:var(--color-ink-500)]'
-        }
+        ${active ? activeTone : inactive}
+        ${disabled ? 'cursor-default' : ''}
       `}
     >
       {children}
@@ -248,6 +251,20 @@ export function MatchPredictionModal({
 
   const homeScoreNum = parseScoreInput(homeScore);
   const awayScoreNum = parseScoreInput(awayScore);
+
+  // Auto-derive the winner from the score: a result fully determines the
+  // outcome, so keep the winner pick in sync whenever both scores are entered
+  // (and whenever the user edits them). The pills become read-only in this state.
+  useEffect(() => {
+    if (homeScoreNum == null || awayScoreNum == null) return;
+    const derived: WinnerChoice =
+      homeScoreNum > awayScoreNum
+        ? 'HOME'
+        : awayScoreNum > homeScoreNum
+          ? 'AWAY'
+          : 'DRAW';
+    setWinnerChoice((prev) => (prev === derived ? prev : derived));
+  }, [homeScoreNum, awayScoreNum]);
 
   const homeSquadIds = useMemo(
     () => new Set(fixture.homeSquad.map((p) => p.playerId)),
@@ -466,14 +483,20 @@ export function MatchPredictionModal({
               <span className="font-mono text-[0.62rem] tracking-[0.3em] uppercase text-[color:var(--color-volt-200)]">
                 / Winner
               </span>
-              {winnerChoice !== 'NONE' && (
-                <button
-                  type="button"
-                  onClick={() => setWinnerChoice('NONE')}
-                  className="ml-auto font-mono text-[0.6rem] tracking-[0.2em] uppercase text-[color:var(--color-ink-400)] hover:text-[color:var(--color-ink-100)] transition-colors"
-                >
-                  Clear
-                </button>
+              {bothScoresProvided ? (
+                <span className="ml-auto font-mono text-[0.6rem] tracking-[0.2em] uppercase text-[color:var(--color-ink-400)]">
+                  Set from score
+                </span>
+              ) : (
+                winnerChoice !== 'NONE' && (
+                  <button
+                    type="button"
+                    onClick={() => setWinnerChoice('NONE')}
+                    className="ml-auto font-mono text-[0.6rem] tracking-[0.2em] uppercase text-[color:var(--color-ink-400)] hover:text-[color:var(--color-ink-100)] transition-colors"
+                  >
+                    Clear
+                  </button>
+                )
               )}
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
@@ -481,6 +504,7 @@ export function MatchPredictionModal({
                 active={winnerChoice === 'HOME'}
                 onClick={() => setWinnerChoice('HOME')}
                 tone="home"
+                disabled={bothScoresProvided}
               >
                 {fixture.homeTeam.name} win
               </WinnerPill>
@@ -488,6 +512,7 @@ export function MatchPredictionModal({
                 active={winnerChoice === 'DRAW'}
                 onClick={() => setWinnerChoice('DRAW')}
                 tone="draw"
+                disabled={bothScoresProvided}
               >
                 Draw
               </WinnerPill>
@@ -495,10 +520,16 @@ export function MatchPredictionModal({
                 active={winnerChoice === 'AWAY'}
                 onClick={() => setWinnerChoice('AWAY')}
                 tone="away"
+                disabled={bothScoresProvided}
               >
                 {fixture.awayTeam.name} win
               </WinnerPill>
             </div>
+            {bothScoresProvided && (
+              <p className="mt-2 font-mono text-[0.58rem] tracking-[0.16em] uppercase text-[color:var(--color-ink-400)]">
+                Winner follows the score — edit the score to change it.
+              </p>
+            )}
           </section>
 
           {/* Score */}

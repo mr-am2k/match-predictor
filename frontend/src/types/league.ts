@@ -62,6 +62,13 @@ export interface LeagueMember {
   joinedAt: string;
 }
 
+export interface LeagueSyncResult {
+  triggered: boolean;
+  message: string;
+  usedLast24h: number;
+  dailyLimit: number;
+}
+
 export interface PageResponse<T> {
   content: T[];
   page: {

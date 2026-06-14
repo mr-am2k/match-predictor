@@ -49,14 +49,45 @@ public class SyncOrchestrator {
     }
 
     /**
-     * True if there is at least one unfinished fixture in this competition's
-     * current season kicking off within [now-4h, now+15min].
+     * True if this competition has a match we should be polling right now —
+     * either an unfinished fixture kicking off within [now-4h, now+15min], or
+     * a fixture our DB already shows as in-play.
+     *
+     * The in-play check matters for long matches: a fixture that goes to extra
+     * time + penalties (or suffers a long delay) can still be underway after the
+     * 4h kickoff window closes. Once we've recorded it as in-play we keep polling
+     * until it actually reaches a FINAL/CANCELLED state, so its result never gets
+     * stranded.
      */
     boolean hasActiveMatchWindow(Competition c) {
         OffsetDateTime from = OffsetDateTime.now().minusHours(4);
         OffsetDateTime to = OffsetDateTime.now().plusMinutes(15);
-        long count = fixtureRepository.countInWindow(c.getId(), UNFINISHED_STATUSES, from, to);
-        return count > 0;
+        long upcomingOrRecent = fixtureRepository.countInWindow(c.getId(), UNFINISHED_STATUSES, from, to);
+        if (upcomingOrRecent > 0) {
+            return true;
+        }
+        return fixtureRepository.countByCompetitionIdAndStatusIn(c.getId(), FixtureStatus.IN_PLAY) > 0;
+    }
+
+    /**
+     * On-demand refresh of a competition's live/recent and upcoming fixtures.
+     * Backs the league owner's "sync match data" button. Lighter than a full
+     * {@link #bootstrapCompetition} (no teams/squads); just pulls fixture state
+     * and settles anything that has finished. Each sub-call is budget-gated, so
+     * an exhausted budget degrades to a no-op rather than an error.
+     */
+    public void refreshFixturesNow(Competition c) {
+        log.info("On-demand fixture refresh for competition={} ({})", c.getId(), c.getName());
+        try {
+            fixtureSyncService.syncLiveAndRecent(c);
+        } catch (Exception e) {
+            log.error("refresh: live+recent failed for competition={}: {}", c.getId(), e.getMessage(), e);
+        }
+        try {
+            fixtureSyncService.syncUpcoming(c);
+        } catch (Exception e) {
+            log.error("refresh: upcoming failed for competition={}: {}", c.getId(), e.getMessage(), e);
+        }
     }
 
     /**

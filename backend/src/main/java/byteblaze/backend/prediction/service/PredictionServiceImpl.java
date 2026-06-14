@@ -463,8 +463,27 @@ public class PredictionServiceImpl implements PredictionService {
                 .fixtureId(fixtureId)
                 .build());
 
-        prediction.setWinnerTeamId(req.winnerTeamId());
-        prediction.setPredictedDraw(req.predictedDraw());
+        // Derive the winner/draw from the score when the caller left it unset.
+        // A score fully determines the outcome, so a prediction of "2-1" with no
+        // explicit pick should still count as a home-win prediction — and stays in
+        // sync whenever the score is updated.
+        Long winnerTeamId = req.winnerTeamId();
+        boolean predictedDraw = req.predictedDraw();
+        if (winnerTeamId == null && !predictedDraw
+                && req.homeScore() != null && req.awayScore() != null) {
+            int homeScore = req.homeScore();
+            int awayScore = req.awayScore();
+            if (homeScore > awayScore) {
+                winnerTeamId = fixture.getHomeTeamId();
+            } else if (awayScore > homeScore) {
+                winnerTeamId = fixture.getAwayTeamId();
+            } else {
+                predictedDraw = true;
+            }
+        }
+
+        prediction.setWinnerTeamId(winnerTeamId);
+        prediction.setPredictedDraw(predictedDraw);
         prediction.setHomeScore(req.homeScore());
         prediction.setAwayScore(req.awayScore());
 

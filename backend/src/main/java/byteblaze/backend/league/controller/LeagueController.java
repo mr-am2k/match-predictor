@@ -8,6 +8,7 @@ import byteblaze.backend.league.dto.LeagueBrowseResponse;
 import byteblaze.backend.league.dto.LeagueMemberResponse;
 import byteblaze.backend.league.dto.LeagueResponse;
 import byteblaze.backend.league.dto.LeagueSummaryResponse;
+import byteblaze.backend.league.dto.LeagueSyncResponse;
 import byteblaze.backend.league.service.LeagueService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -107,5 +108,13 @@ public class LeagueController {
             @AuthenticationPrincipal User currentUser
     ) {
         return ResponseEntity.ok(leagueService.getLeague(id, currentUser));
+    }
+
+    @PostMapping("/{id}/sync")
+    public ResponseEntity<LeagueSyncResponse> triggerSync(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(leagueService.triggerSync(id, currentUser));
     }
 }

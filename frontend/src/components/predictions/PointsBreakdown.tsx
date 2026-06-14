@@ -1,4 +1,5 @@
-import { Check, Minus, Target, X, Zap } from 'lucide-react';
+import { Check, ChevronDown, Minus, Target, X, Zap } from 'lucide-react';
+import { useState } from 'react';
 import type { ScoreBreakdown, ScoreLine } from '../../types/prediction';
 
 /**
@@ -92,19 +93,33 @@ export function PointsBreakdown({
 }: {
   breakdown: ScoreBreakdown;
 }) {
+  // Collapsed by default — the header shows the total; expand to see how it adds up.
+  const [expanded, setExpanded] = useState(false);
   const hasBonus = breakdown.multiplier > 1;
   const winnerHit = breakdown.winnerPoints > 0;
   const exactHit = breakdown.scorePoints > 0;
 
   return (
     <div className="rounded-xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-900)]/50 overflow-hidden">
-      {/* Total header */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/60">
+      {/* Total header — click to toggle the full ledger */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left bg-[color:var(--color-ink-850)]/60 hover:bg-[color:var(--color-ink-850)] transition-colors ${
+          expanded ? 'border-b border-[color:var(--color-ink-700)]' : ''
+        }`}
+      >
         <div className="flex items-center gap-2">
           <Target className="w-3.5 h-3.5 text-[color:var(--color-volt-200)]" />
           <span className="font-mono text-[0.6rem] tracking-[0.24em] uppercase text-[color:var(--color-ink-200)]">
             Points breakdown
           </span>
+          <ChevronDown
+            className={`w-3.5 h-3.5 text-[color:var(--color-ink-400)] transition-transform ${
+              expanded ? 'rotate-180' : ''
+            }`}
+          />
         </div>
         <div className="flex items-baseline gap-1">
           <span
@@ -120,40 +135,44 @@ export function PointsBreakdown({
             pts
           </span>
         </div>
-      </div>
+      </button>
 
-      {/* Ledger */}
-      <div className="px-4 py-1 divide-y divide-[color:var(--color-ink-800)]">
-        <CategoryRow label="Winner" hit={winnerHit} points={breakdown.winnerPoints} />
-        <CategoryRow label="Exact score" hit={exactHit} points={breakdown.scorePoints} />
-        {breakdown.scorers.map((line) => (
-          <PlayerRow key={`s-${line.playerId}`} line={line} kind="goal" />
-        ))}
-        {breakdown.assisters.map((line) => (
-          <PlayerRow key={`a-${line.playerId}`} line={line} kind="assist" />
-        ))}
-      </div>
+      {expanded && (
+        <>
+          {/* Ledger */}
+          <div className="px-4 py-1 divide-y divide-[color:var(--color-ink-800)]">
+            <CategoryRow label="Winner" hit={winnerHit} points={breakdown.winnerPoints} />
+            <CategoryRow label="Exact score" hit={exactHit} points={breakdown.scorePoints} />
+            {breakdown.scorers.map((line) => (
+              <PlayerRow key={`s-${line.playerId}`} line={line} kind="goal" />
+            ))}
+            {breakdown.assisters.map((line) => (
+              <PlayerRow key={`a-${line.playerId}`} line={line} kind="assist" />
+            ))}
+          </div>
 
-      {/* Multiplier footer */}
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/40">
-        <span className="font-mono text-[0.58rem] tracking-[0.12em] uppercase text-[color:var(--color-ink-400)] tabular-nums">
-          Base {breakdown.baseTotal}
-          <span className="text-[color:var(--color-ink-600)] mx-1.5">×</span>
-          {fmtMultiplier(breakdown.multiplier)}
-          <span className="text-[color:var(--color-ink-600)] mx-1.5">=</span>
-          <span className="text-[color:var(--color-ink-100)]">{breakdown.total}</span>
-        </span>
-        {hasBonus ? (
-          <span className="chip chip-volt">
-            <Zap className="w-3 h-3" />×{fmtMultiplier(breakdown.multiplier)} bonus ·{' '}
-            {breakdown.categoriesHit} of 4
-          </span>
-        ) : (
-          <span className="font-mono text-[0.55rem] tracking-[0.16em] uppercase text-[color:var(--color-ink-500)]">
-            {breakdown.categoriesHit} of 4 hit
-          </span>
-        )}
-      </div>
+          {/* Multiplier footer */}
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/40">
+            <span className="font-mono text-[0.58rem] tracking-[0.12em] uppercase text-[color:var(--color-ink-400)] tabular-nums">
+              Base {breakdown.baseTotal}
+              <span className="text-[color:var(--color-ink-600)] mx-1.5">×</span>
+              {fmtMultiplier(breakdown.multiplier)}
+              <span className="text-[color:var(--color-ink-600)] mx-1.5">=</span>
+              <span className="text-[color:var(--color-ink-100)]">{breakdown.total}</span>
+            </span>
+            {hasBonus ? (
+              <span className="chip chip-volt">
+                <Zap className="w-3 h-3" />×{fmtMultiplier(breakdown.multiplier)} bonus ·{' '}
+                {breakdown.categoriesHit} of 4
+              </span>
+            ) : (
+              <span className="font-mono text-[0.55rem] tracking-[0.16em] uppercase text-[color:var(--color-ink-500)]">
+                {breakdown.categoriesHit} of 4 hit
+              </span>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

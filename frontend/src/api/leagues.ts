@@ -4,6 +4,7 @@ import type {
   LeagueBrowseItem,
   LeagueMember,
   LeagueSummary,
+  LeagueSyncResult,
   PageResponse,
 } from '../types/league';
 import type { GameweekStandingsRow, StandingsRow } from '../types/standings';
@@ -44,6 +45,14 @@ export async function getLeague(id: string): Promise<League> {
     credentials: 'include',
   });
   return handleResponse<League>(response);
+}
+
+export async function triggerLeagueSync(id: string): Promise<LeagueSyncResult> {
+  const response = await fetch(`${API_BASE}/${id}/sync`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  return handleResponse<LeagueSyncResult>(response);
 }
 
 export function buildJoinUrl(joinCode: string): string {

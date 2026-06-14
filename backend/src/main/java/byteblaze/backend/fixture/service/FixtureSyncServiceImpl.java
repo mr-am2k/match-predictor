@@ -64,42 +64,18 @@ public class FixtureSyncServiceImpl implements FixtureSyncService {
 
         if (response.isEmpty() || response.get().response() == null) {
             log.info("syncLiveAndRecent: no response for competition={} (budget or error)", competitionId);
-            return;
-        }
-
-        final List<FixturesResponse.FixtureRow> rows = response.get().response();
-        final List<Long> newlyFinalFixtureIds = new ArrayList<>();
-
-        for (FixturesResponse.FixtureRow row : rows) {
-            final UpsertResult result = upsertFixture(row, competitionId, season);
-
-            if (result != null && result.transitionedToFinal) {
-                newlyFinalFixtureIds.add(result.fixtureId);
+        } else {
+            final List<FixturesResponse.FixtureRow> rows = response.get().response();
+            for (FixturesResponse.FixtureRow row : rows) {
+                upsertFixture(row, competitionId, season);
             }
+            log.info("syncLiveAndRecent: competition={} fixtures={}", competitionId, rows.size());
         }
 
-        log.info("syncLiveAndRecent: competition={} fixtures={} newly-final={}",
-                competitionId, rows.size(), newlyFinalFixtureIds.size());
-
-        for (Long fixtureId : newlyFinalFixtureIds) {
-            syncEventsForFixture(fixtureId);
-            eventPublisher.publishEvent(new FixtureSettledEvent(fixtureId));
-        }
-
-        // Season-settled detection: if this sync produced at least one final
-        // transition AND there are now zero unfinished fixtures for this
-        // (competition, season), publish a SeasonSettledEvent so the
-        // overall-prediction scoring listener can run.
-        if (!newlyFinalFixtureIds.isEmpty()) {
-            long remaining = fixtureRepository.countByCompetitionIdAndSeasonYearAndStatusIn(
-                    competitionId, season, UNFINISHED_STATUSES);
-
-            if (remaining == 0) {
-                log.info("syncLiveAndRecent: competition={} season={} all fixtures settled; "
-                        + "publishing SeasonSettledEvent", competitionId, season);
-                eventPublisher.publishEvent(new SeasonSettledEvent(competitionId, season));
-            }
-        }
+        // Settle anything now final but not yet scored — including fixtures whose
+        // final status was first recorded by syncUpcoming, or that we missed while
+        // they overran the live window. Path-independent so points never strand.
+        settlePendingFixtures(competition);
     }
 
     @Override
@@ -132,6 +108,54 @@ public class FixtureSyncServiceImpl implements FixtureSyncService {
         }
 
         log.info("syncUpcoming: competition={} upserted={}", competitionId, updated);
+
+        // This full-season pass routinely marks matches final (every 6h, no
+        // window gating), so settle them here too — otherwise their points would
+        // never be computed.
+        settlePendingFixtures(competition);
+    }
+
+    @Override
+    @Transactional
+    public void settlePendingFixtures(Competition competition) {
+        final Long competitionId = competition.getId();
+        final Integer season = competition.getSeasonYear();
+
+        final List<Fixture> pending = fixtureRepository
+                .findByCompetitionIdAndSeasonYearAndStatusInAndSettledAtIsNull(
+                        competitionId, season, FixtureStatus.FINAL);
+
+        if (pending.isEmpty()) {
+            return;
+        }
+
+        int dispatched = 0;
+        for (Fixture fixture : pending) {
+            // If the budget is exhausted we skip dispatch so the fixture stays
+            // pending and is retried later, rather than settling it with no events
+            // and locking in zero scorer/assister points.
+            final boolean eventsFetched = syncEventsForFixture(fixture.getId());
+            if (!eventsFetched) {
+                continue;
+            }
+            eventPublisher.publishEvent(new FixtureSettledEvent(fixture.getId()));
+            dispatched++;
+        }
+
+        log.info("settlePendingFixtures: competition={} season={} pending={} dispatched={}",
+                competitionId, season, pending.size(), dispatched);
+
+        // Season-settled detection: if we just settled the last outstanding
+        // fixture(s), tell the overall-prediction scorer the season is done.
+        if (dispatched > 0) {
+            final long remaining = fixtureRepository.countByCompetitionIdAndSeasonYearAndStatusIn(
+                    competitionId, season, UNFINISHED_STATUSES);
+            if (remaining == 0) {
+                log.info("settlePendingFixtures: competition={} season={} all fixtures settled; "
+                        + "publishing SeasonSettledEvent", competitionId, season);
+                eventPublisher.publishEvent(new SeasonSettledEvent(competitionId, season));
+            }
+        }
     }
 
     private UpsertResult upsertFixture(FixturesResponse.FixtureRow row,
@@ -203,12 +227,17 @@ public class FixtureSyncServiceImpl implements FixtureSyncService {
         return new UpsertResult(fixtureId, transitionedToFinal);
     }
 
-    private void syncEventsForFixture(Long fixtureId) {
+    /**
+     * @return true if events were successfully fetched from the API (even if the
+     *         match had zero goals); false if the call was skipped/failed (e.g.
+     *         budget exhausted), in which case the caller should not settle yet.
+     */
+    private boolean syncEventsForFixture(Long fixtureId) {
         final Optional<FixtureEventsResponse> response = client.fetchFixtureEvents(fixtureId);
 
         if (response.isEmpty() || response.get().response() == null) {
             log.info("syncEventsForFixture: no events response for fixture={} (budget or error)", fixtureId);
-            return;
+            return false;
         }
 
         fixtureEventRepository.deleteByFixtureId(fixtureId);
@@ -258,6 +287,7 @@ public class FixtureSyncServiceImpl implements FixtureSyncService {
         }
 
         log.info("syncEventsForFixture: fixture={} events-stored={}", fixtureId, toInsert.size());
+        return true;
     }
 
     private FixtureStatus mapStatus(FixturesResponse.FixtureRow row) {

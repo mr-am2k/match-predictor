@@ -54,4 +54,10 @@ public interface LeagueRepository extends JpaRepository<League, UUID> {
 
     @Query("SELECT l FROM League l WHERE l.competition.id = :compId AND l.seasonYear = :season AND l.archived = false")
     List<League> findActiveByCompetitionAndSeason(@Param("compId") Long compId, @Param("season") Integer season);
+
+    @Query("SELECT l.owner.id FROM League l WHERE l.id = :id")
+    Optional<UUID> findOwnerIdById(@Param("id") UUID id);
+
+    @Query("SELECT l.competition.id FROM League l WHERE l.id = :id")
+    Optional<Long> findCompetitionIdById(@Param("id") UUID id);
 }

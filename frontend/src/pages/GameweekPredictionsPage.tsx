@@ -17,6 +17,28 @@ import type {
   MyPrediction,
 } from '../types/prediction';
 
+const FINAL_STATUSES = new Set(['FT', 'AET', 'PEN']);
+
+/**
+ * Keep upcoming/unfinished matches near the top so there's always something to
+ * predict, but pin the most-recently-finished match above them (so the latest
+ * result stays in view) and push the rest of the finished matches to the bottom.
+ */
+function orderFixtures(fixtures: FixtureWithPrediction[]): FixtureWithPrediction[] {
+  const byKickoff = (a: FixtureWithPrediction, b: FixtureWithPrediction) =>
+    new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime();
+
+  const finished = fixtures.filter((f) => FINAL_STATUSES.has(f.status)).sort(byKickoff);
+  const unfinished = fixtures.filter((f) => !FINAL_STATUSES.has(f.status)).sort(byKickoff);
+
+  if (finished.length === 0) return unfinished;
+
+  // The latest kickoff among finished matches is the one that finished last.
+  const lastFinished = finished[finished.length - 1];
+  const olderFinished = finished.slice(0, -1);
+  return [lastFinished, ...unfinished, ...olderFinished];
+}
+
 function pickDefaultRound(gameweeks: GameweekSummary[]): string | null {
   if (gameweeks.length === 0) return null;
   const open = gameweeks.filter((gw) => gw.status === 'OPEN');
@@ -130,6 +152,11 @@ export function GameweekPredictionsPage() {
     if (!fixturesData || revealFixtureId == null) return null;
     return fixturesData.fixtures.find((f) => f.id === revealFixtureId) ?? null;
   }, [fixturesData, revealFixtureId]);
+
+  const orderedFixtures = useMemo(
+    () => (fixturesData ? orderFixtures(fixturesData.fixtures) : []),
+    [fixturesData]
+  );
 
   const handlePredictionSaved = useCallback(
     (updated: MyPrediction) => {
@@ -290,7 +317,7 @@ export function GameweekPredictionsPage() {
                   />
                 ) : (
                   <div className="grid gap-3 stagger">
-                    {fixturesData.fixtures.map((fixture) => (
+                    {orderedFixtures.map((fixture) => (
                       <MatchPredictionCard
                         key={fixture.id}
                         fixture={fixture}

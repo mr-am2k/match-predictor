@@ -9,13 +9,14 @@ import {
   ListChecks,
   Loader2,
   Lock,
+  RefreshCw,
   Star,
   Trophy,
   Users,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { buildJoinUrl, getLeague } from '../api/leagues';
+import { buildJoinUrl, getLeague, triggerLeagueSync } from '../api/leagues';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../components/ui/Card';
 import { MemberList } from '../components/leagues/MemberList';
@@ -48,6 +49,8 @@ export function LeagueDetailPage() {
   const [copiedTarget, setCopiedTarget] = useState<'code' | 'url' | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [membersExpanded, setMembersExpanded] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -73,6 +76,27 @@ export function LeagueDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  const handleSync = async () => {
+    if (!id || syncing) return;
+    setSyncing(true);
+    setSyncNotice(null);
+    try {
+      const result = await triggerLeagueSync(id);
+      setSyncNotice({
+        tone: result.triggered ? 'ok' : 'warn',
+        text: `${result.message} (${result.usedLast24h}/${result.dailyLimit} calls today)`,
+      });
+    } catch (err) {
+      setSyncNotice({
+        tone: 'warn',
+        text: err instanceof Error ? err.message : 'Sync failed',
+      });
+    } finally {
+      setSyncing(false);
+      window.setTimeout(() => setSyncNotice(null), 6000);
+    }
+  };
 
   const handleCopy = async (value: string, target: 'code' | 'url') => {
     try {
@@ -198,6 +222,29 @@ export function LeagueDetailPage() {
                 >
                   View predictions
                 </Button>
+                {isOwner && (
+                  <Button
+                    variant="outline"
+                    onClick={handleSync}
+                    disabled={syncing}
+                    icon={<RefreshCw className={syncing ? 'animate-spin' : undefined} />}
+                    className="w-full justify-center"
+                    title="Pull the latest live, finished and upcoming match data for this competition"
+                  >
+                    {syncing ? 'Syncing…' : 'Sync match data'}
+                  </Button>
+                )}
+                {syncNotice && (
+                  <p
+                    className={`font-mono text-[0.62rem] tracking-[0.12em] leading-relaxed text-center ${
+                      syncNotice.tone === 'ok'
+                        ? 'text-[color:var(--color-win-500)]'
+                        : 'text-[color:var(--color-ink-300)]'
+                    }`}
+                  >
+                    {syncNotice.text}
+                  </p>
+                )}
               </div>
             </div>
           </div>
