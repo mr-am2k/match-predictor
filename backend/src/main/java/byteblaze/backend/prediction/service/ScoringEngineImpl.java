@@ -162,7 +162,9 @@ public class ScoringEngineImpl implements ScoringEngine {
             }
             int actual = actualGoalsByPlayer.getOrDefault(pick.playerId(), 0);
             boolean correct = actual == pick.count();
-            int points = correct ? rules.getMatchScorerPoints() : 0;
+            // Points scale with the goal tally: a correct exact-count pick earns
+            // matchScorerPoints per goal (e.g. 3 pts x 2 goals = 6).
+            int points = correct ? rules.getMatchScorerPoints() * pick.count() : 0;
             if (correct) {
                 total += points;
                 anyHit = true;

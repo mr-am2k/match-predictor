@@ -60,7 +60,7 @@ const SECTIONS: Section[] = [
       {
         field: 'matchScorerPoints',
         label: 'Each correct scorer',
-        description: 'Per goalscorer you correctly predicted (up to 3 per match).',
+        description: 'Points awarded per goal when your scorer pick matches the exact tally (e.g. 3 pts x 2 goals = 6).',
         min: 0,
         max: 50,
         isDecimal: false,
