@@ -64,6 +64,7 @@ export function EditScoringRulesPage() {
           matchBonus4x: rulesData.matchBonus4x,
           leagueBonus2of3: rulesData.leagueBonus2of3,
           leagueBonus3of3: rulesData.leagueBonus3of3,
+          assistersEnabled: rulesData.assistersEnabled,
         });
       })
       .catch((err: unknown) => {
@@ -103,6 +104,7 @@ export function EditScoringRulesPage() {
         matchBonus4x: fresh.matchBonus4x,
         leagueBonus2of3: fresh.leagueBonus2of3,
         leagueBonus3of3: fresh.leagueBonus3of3,
+        assistersEnabled: fresh.assistersEnabled,
       });
     } catch {
       // swallow; user sees the existing banner
@@ -164,7 +166,12 @@ export function EditScoringRulesPage() {
   }
 
   const isOwner = user !== null && league.owner.id === user.id;
-  const readOnly = !rules.editable || !isOwner;
+  const isAdmin = user !== null && user.role === 'ADMIN';
+  // Admins can edit any league's rules mid-season (including the assister
+  // toggle), bypassing the locked-once-predictions guard. Owners keep the
+  // original behaviour: editable only until the first prediction lands.
+  const canEdit = isOwner || isAdmin;
+  const readOnly = !canEdit || (!isAdmin && !rules.editable);
 
   return (
     <div className="min-h-[calc(100vh-72px)]">
@@ -191,17 +198,27 @@ export function EditScoringRulesPage() {
         </div>
 
         <div className="space-y-3">
-          {!isOwner && (
+          {!canEdit && (
             <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-draw-500)]/40 bg-[color:var(--color-draw-500)]/8 text-[color:var(--color-draw-500)] text-sm">
               <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span className="text-[color:var(--color-ink-100)]">Only the owner can edit these rules.</span>
             </div>
           )}
 
-          {!rules.editable && (
+          {!rules.editable && !isAdmin && (
             <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-draw-500)]/40 bg-[color:var(--color-draw-500)]/8">
               <Lock className="w-4 h-4 mt-0.5 flex-shrink-0 text-[color:var(--color-draw-500)]" />
               <span className="text-sm text-[color:var(--color-ink-100)]">{SCORING_LOCKED_MESSAGE}</span>
+            </div>
+          )}
+
+          {!rules.editable && isAdmin && (
+            <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-[color:var(--color-volt-200)]/40 bg-[color:var(--color-volt-200)]/8">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-[color:var(--color-volt-200)]" />
+              <span className="text-sm text-[color:var(--color-ink-100)]">
+                Admin override — predictions already exist in this league. Changes apply only to fixtures
+                that settle from now on; past results keep their points.
+              </span>
             </div>
           )}
 

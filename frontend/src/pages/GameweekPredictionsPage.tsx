@@ -321,6 +321,7 @@ export function GameweekPredictionsPage() {
                       <MatchPredictionCard
                         key={fixture.id}
                         fixture={fixture}
+                        assistersEnabled={fixturesData?.assistersEnabled ?? true}
                         onEdit={() => setEditingFixtureId(fixture.id)}
                         onReveal={() => setRevealFixtureId(fixture.id)}
                       />
@@ -337,6 +338,7 @@ export function GameweekPredictionsPage() {
         <MatchPredictionModal
           fixture={editingFixture}
           leagueId={id}
+          assistersEnabled={fixturesData?.assistersEnabled ?? true}
           open={true}
           onClose={() => setEditingFixtureId(null)}
           onSaved={handlePredictionSaved}

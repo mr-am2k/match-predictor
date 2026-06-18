@@ -48,6 +48,11 @@ public record LeagueScoringRulesRequest(
         BigDecimal leagueBonus2of3,
 
         @NotNull @DecimalMin("1.00") @DecimalMax("10.00")
-        BigDecimal leagueBonus3of3
+        BigDecimal leagueBonus3of3,
+
+        // Per-match assister toggle (V13). Nullable for backward compatibility —
+        // older clients and the league-creation flow may omit it, in which case
+        // it is treated as enabled (true). See LeagueScoringRulesServiceImpl.
+        Boolean assistersEnabled
 ) {
 }

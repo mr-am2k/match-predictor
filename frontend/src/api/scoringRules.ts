@@ -35,6 +35,8 @@ function normalizeResponse(raw: LeagueScoringRulesResponse): LeagueScoringRulesR
     matchBonus4x: Number(raw.matchBonus4x),
     leagueBonus2of3: Number(raw.leagueBonus2of3),
     leagueBonus3of3: Number(raw.leagueBonus3of3),
+    // Absent on legacy responses → treat as enabled.
+    assistersEnabled: raw.assistersEnabled !== false,
     editable: Boolean(raw.editable),
   };
 }

@@ -22,6 +22,7 @@ public record LeagueScoringRulesResponse(
         BigDecimal matchBonus4x,
         BigDecimal leagueBonus2of3,
         BigDecimal leagueBonus3of3,
+        boolean assistersEnabled,
         boolean editable
 ) {
 }

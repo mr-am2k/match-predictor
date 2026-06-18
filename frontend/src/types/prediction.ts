@@ -77,6 +77,7 @@ export interface GameweekFixtures {
   round: string;
   locksAt: string | null;
   locked: boolean;
+  assistersEnabled: boolean;
   fixtures: FixtureWithPrediction[];
 }
 

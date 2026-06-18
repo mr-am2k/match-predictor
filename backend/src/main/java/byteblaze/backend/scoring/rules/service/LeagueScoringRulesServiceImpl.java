@@ -1,5 +1,6 @@
 package byteblaze.backend.scoring.rules.service;
 
+import byteblaze.backend.auth.entity.Role;
 import byteblaze.backend.auth.entity.User;
 import byteblaze.backend.league.entity.League;
 import byteblaze.backend.league.exception.LeagueAccessDeniedException;
@@ -75,14 +76,18 @@ public class LeagueScoringRulesServiceImpl implements LeagueScoringRulesService 
         League league = leagueRepo.findById(leagueId)
                 .orElseThrow(() -> new LeagueNotFoundException("League not found: " + leagueId));
 
-        if (!league.getOwner().getId().equals(currentUser.getId())) {
-            log.debug("User {} attempted to edit scoring rules for league {} (not owner)",
+        // Admins may edit any league's rules mid-season (including the assister
+        // toggle), bypassing both the owner-only and locked-once-predictions
+        // guards. Owners keep the original, stricter behaviour.
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN;
+
+        if (!isAdmin && !league.getOwner().getId().equals(currentUser.getId())) {
+            log.debug("User {} attempted to edit scoring rules for league {} (not owner, not admin)",
                     currentUser.getId(), leagueId);
             throw new OnlyOwnerCanEditScoringRulesException();
         }
 
-        boolean editable = computeEditable(leagueId);
-        if (!editable) {
+        if (!isAdmin && !computeEditable(leagueId)) {
             log.debug("Scoring rules locked for league {} (predictions already submitted)", leagueId);
             throw new ScoringRulesLockedException();
         }
@@ -153,6 +158,7 @@ public class LeagueScoringRulesServiceImpl implements LeagueScoringRulesService 
                 .matchBonus4x(DEFAULT_MATCH_BONUS_4X)
                 .leagueBonus2of3(DEFAULT_LEAGUE_BONUS_2OF3)
                 .leagueBonus3of3(DEFAULT_LEAGUE_BONUS_3OF3)
+                .assistersEnabled(true)
                 .build();
     }
 
@@ -173,6 +179,8 @@ public class LeagueScoringRulesServiceImpl implements LeagueScoringRulesService 
         rules.setMatchBonus4x(body.matchBonus4x());
         rules.setLeagueBonus2of3(body.leagueBonus2of3());
         rules.setLeagueBonus3of3(body.leagueBonus3of3());
+        // Null (older clients / league creation) means "leave assisters enabled".
+        rules.setAssistersEnabled(body.assistersEnabled() == null || body.assistersEnabled());
     }
 
     private static LeagueScoringRulesResponse toResponse(LeagueScoringRules rules, boolean editable) {
@@ -189,6 +197,7 @@ public class LeagueScoringRulesServiceImpl implements LeagueScoringRulesService 
                 rules.getMatchBonus4x(),
                 rules.getLeagueBonus2of3(),
                 rules.getLeagueBonus3of3(),
+                rules.isAssistersEnabled(),
                 editable
         );
     }

@@ -38,6 +38,8 @@ import byteblaze.backend.prediction.repository.PredictionAssisterRepository;
 import byteblaze.backend.prediction.repository.PredictionRepository;
 import byteblaze.backend.prediction.repository.PredictionScoreRepository;
 import byteblaze.backend.prediction.repository.PredictionScorerRepository;
+import byteblaze.backend.scoring.rules.entity.LeagueScoringRules;
+import byteblaze.backend.scoring.rules.repository.LeagueScoringRulesRepository;
 import byteblaze.backend.team.entity.Team;
 import byteblaze.backend.team.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +73,7 @@ public class PredictionServiceImpl implements PredictionService {
     private final PredictionScorerRepository predictionScorerRepository;
     private final PredictionAssisterRepository predictionAssisterRepository;
     private final PredictionScoreRepository predictionScoreRepository;
+    private final LeagueScoringRulesRepository leagueScoringRulesRepository;
     private final UserRepository userRepository;
     private final FixtureRepository fixtureRepository;
     private final LeagueRepository leagueRepository;
@@ -166,6 +169,7 @@ public class PredictionServiceImpl implements PredictionService {
         League league = requireLeagueAndMembership(leagueId, currentUser);
         Long competitionId = league.getCompetition().getId();
         Integer seasonYear = league.getSeasonYear();
+        boolean assistersEnabled = assistersEnabled(leagueId);
 
         List<Fixture> fixtures = fixtureRepository
                 .findAllByCompetitionIdAndSeasonYearAndRound(competitionId, seasonYear, round);
@@ -174,7 +178,7 @@ public class PredictionServiceImpl implements PredictionService {
                 .toList();
 
         if (fixtures.isEmpty()) {
-            return new GameweekFixturesResponse(round, null, false, List.of());
+            return new GameweekFixturesResponse(round, null, false, assistersEnabled, List.of());
         }
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -318,7 +322,7 @@ public class PredictionServiceImpl implements PredictionService {
         boolean responseLocked = fixtures.stream()
                 .allMatch(f -> !now.isBefore(f.getKickoffAt().minusMinutes(15)));
 
-        return new GameweekFixturesResponse(round, responseLocksAt, responseLocked, out);
+        return new GameweekFixturesResponse(round, responseLocksAt, responseLocked, assistersEnabled, out);
     }
 
     @Override
@@ -448,9 +452,14 @@ public class PredictionServiceImpl implements PredictionService {
             throw new FixtureLockedException(fixture.getId(), fixture.getKickoffAt());
         }
 
-        // Normalise lists to mutable copies, treating null as empty.
+        // Normalise lists to mutable copies, treating null as empty. When the
+        // league has per-match assisters disabled we ignore any incoming
+        // assisters entirely (tolerant of older clients) rather than 400ing.
+        boolean assistersEnabled = assistersEnabled(leagueId);
         List<PlayerPick> scorers = req.scorers() == null ? List.of() : req.scorers();
-        List<PlayerPick> assisters = req.assisters() == null ? List.of() : req.assisters();
+        List<PlayerPick> assisters = (!assistersEnabled || req.assisters() == null)
+                ? List.of()
+                : req.assisters();
 
         validateRequest(req, fixture, scorers, assisters, competitionId, seasonYear);
 
@@ -490,9 +499,13 @@ public class PredictionServiceImpl implements PredictionService {
         prediction = predictionRepository.save(prediction);
         UUID predictionId = prediction.getId();
 
-        // Replace scorers / assisters atomically.
+        // Replace scorers atomically. Assisters are only touched when the league
+        // has them enabled — when disabled we leave any existing assister rows
+        // intact so re-enabling the toggle restores the member's earlier picks.
         predictionScorerRepository.deleteByPredictionId(predictionId);
-        predictionAssisterRepository.deleteByPredictionId(predictionId);
+        if (assistersEnabled) {
+            predictionAssisterRepository.deleteByPredictionId(predictionId);
+        }
 
         if (!scorers.isEmpty()) {
             List<PredictionScorer> rows = scorers.stream()
@@ -505,7 +518,7 @@ public class PredictionServiceImpl implements PredictionService {
             predictionScorerRepository.saveAll(rows);
         }
 
-        if (!assisters.isEmpty()) {
+        if (assistersEnabled && !assisters.isEmpty()) {
             List<PredictionAssister> rows = assisters.stream()
                     .map(pick -> PredictionAssister.builder()
                             .predictionId(predictionId)
@@ -530,6 +543,17 @@ public class PredictionServiceImpl implements PredictionService {
 
     // ----------------- internals -----------------
 
+    /**
+     * Whether per-match assisters are enabled for this league (V13 toggle).
+     * Defaults to {@code true} if the rules row is somehow missing, matching the
+     * column default and pre-toggle behaviour.
+     */
+    private boolean assistersEnabled(UUID leagueId) {
+        return leagueScoringRulesRepository.findById(leagueId)
+                .map(LeagueScoringRules::isAssistersEnabled)
+                .orElse(true);
+    }
+
     private League requireLeagueAndMembership(UUID leagueId, User currentUser) {
         League league = leagueRepository.findById(leagueId)
                 .orElseThrow(() -> new LeagueNotFoundException("League not found: " + leagueId));
@@ -551,8 +575,9 @@ public class PredictionServiceImpl implements PredictionService {
 
         // Reject any scorer/assister picks when either score is missing — the caps are now
         // derived entirely from the predicted score, so picks without both scores are ambiguous.
-        boolean hasScorerPicks = req.scorers() != null && !req.scorers().isEmpty();
-        boolean hasAssisterPicks = req.assisters() != null && !req.assisters().isEmpty();
+        // Keyed on the normalised lists: when assisters are disabled the list is already empty.
+        boolean hasScorerPicks = !scorers.isEmpty();
+        boolean hasAssisterPicks = !assisters.isEmpty();
         if ((hasScorerPicks || hasAssisterPicks)
                 && (req.homeScore() == null || req.awayScore() == null)) {
             throw new PredictionValidationException(
