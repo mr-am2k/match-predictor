@@ -9,7 +9,13 @@ interface ScoringRulesTableProps {
   errors?: Partial<Record<keyof LeagueScoringRules, string>>;
 }
 
-type Field = keyof LeagueScoringRules;
+// Numeric rule fields only — excludes the boolean `assistersEnabled`, which is
+// rendered via the dedicated toggle rather than the numeric input rows.
+type Field = {
+  [K in keyof LeagueScoringRules]: LeagueScoringRules[K] extends number
+    ? K
+    : never;
+}[keyof LeagueScoringRules];
 
 interface Row {
   field: Field;
