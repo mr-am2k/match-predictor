@@ -201,6 +201,55 @@ export function ScoringRulesTable({
         </div>
       )}
 
+      <div className="rounded-xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/60 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-base tracking-wide uppercase text-[color:var(--color-ink-50)]">
+              Per-match assisters
+            </p>
+            <p className="text-xs text-[color:var(--color-ink-300)] leading-relaxed mt-1">
+              Let members predict assisters and earn points for them. Turning this off hides assisters
+              from new predictions and removes them from scoring — fixtures that already settled keep
+              their points. You can turn it back on at any time.
+            </p>
+          </div>
+          {readOnly ? (
+            <div className="flex-shrink-0 text-right">
+              <span
+                className={`inline-flex items-center px-3 py-1.5 rounded-lg border font-mono text-[0.6rem] tracking-[0.2em] uppercase ${
+                  value.assistersEnabled
+                    ? 'border-[color:var(--color-volt-200)]/30 bg-[color:var(--color-volt-200)]/5 text-[color:var(--color-volt-200)]'
+                    : 'border-[color:var(--color-ink-600)] bg-[color:var(--color-ink-800)] text-[color:var(--color-ink-400)]'
+                }`}
+              >
+                {value.assistersEnabled ? 'On' : 'Off'}
+              </span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={value.assistersEnabled}
+              aria-label="Toggle per-match assisters"
+              onClick={() =>
+                onChange({ ...value, assistersEnabled: !value.assistersEnabled })
+              }
+              className={`flex-shrink-0 relative inline-flex h-6 w-11 items-center rounded-full border transition-colors ${
+                value.assistersEnabled
+                  ? 'bg-[color:var(--color-volt-200)]/80 border-[color:var(--color-volt-200)]'
+                  : 'bg-[color:var(--color-ink-800)] border-[color:var(--color-ink-600)]'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-[color:var(--color-ink-950)] transition-transform ${
+                  value.assistersEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          )}
+        </div>
+      </div>
+
       {SECTIONS.map((section) => (
         <div key={section.id} className="space-y-4">
           <div className="flex items-center gap-3">

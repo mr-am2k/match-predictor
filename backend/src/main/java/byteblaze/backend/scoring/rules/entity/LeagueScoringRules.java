@@ -72,6 +72,16 @@ public class LeagueScoringRules {
     @Column(name = "league_bonus_3of3", nullable = false, precision = 4, scale = 2)
     private BigDecimal leagueBonus3of3;
 
+    /**
+     * Whether per-match assister picks are active for this league (V13). When
+     * {@code false} the scoring engine ignores assisters and re-tiers the match
+     * bonus to three categories; the prediction UI hides the assister section.
+     * Fully reversible — flipping back to {@code true} restores assisters going
+     * forward without touching already-settled scores.
+     */
+    @Column(name = "assisters_enabled", nullable = false)
+    private boolean assistersEnabled;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

@@ -10,6 +10,7 @@ import { PointsBreakdown } from './PointsBreakdown';
 
 interface MatchPredictionCardProps {
   fixture: FixtureWithPrediction;
+  assistersEnabled: boolean;
   onEdit: () => void;
   onReveal: () => void;
 }
@@ -94,6 +95,7 @@ function TeamCrest({ name, logoUrl }: { name: string; logoUrl: string | null }) 
 
 export function MatchPredictionCard({
   fixture,
+  assistersEnabled,
   onEdit,
   onReveal,
 }: MatchPredictionCardProps) {
@@ -270,7 +272,7 @@ export function MatchPredictionCard({
         ) : (
           hasPrediction &&
           p &&
-          (p.scorers.length > 0 || p.assisters.length > 0) && (
+          (p.scorers.length > 0 || (assistersEnabled && p.assisters.length > 0)) && (
             <div className="mt-5 pt-4 border-t border-dashed border-[color:var(--color-ink-700)] space-y-1.5">
               {p.scorers.length > 0 && (
                 <p className="text-xs text-[color:var(--color-ink-200)] leading-relaxed">
@@ -282,7 +284,7 @@ export function MatchPredictionCard({
                   </span>
                 </p>
               )}
-              {p.assisters.length > 0 && (
+              {assistersEnabled && p.assisters.length > 0 && (
                 <p className="text-xs text-[color:var(--color-ink-200)] leading-relaxed">
                   <span className="font-mono text-[0.58rem] tracking-[0.22em] uppercase text-[color:var(--color-ink-400)] mr-2">
                     Assisters

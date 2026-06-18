@@ -11,6 +11,9 @@ export interface LeagueScoringRules {
   matchBonus4x: number;
   leagueBonus2of3: number;
   leagueBonus3of3: number;
+  // Per-match assister toggle (V13). When false, assisters are hidden from the
+  // prediction UI and excluded from scoring going forward.
+  assistersEnabled: boolean;
 }
 
 export interface LeagueScoringRulesResponse extends LeagueScoringRules {
@@ -30,6 +33,7 @@ export const DEFAULT_SCORING_RULES: LeagueScoringRules = {
   matchBonus4x: 3,
   leagueBonus2of3: 1.5,
   leagueBonus3of3: 3,
+  assistersEnabled: true,
 };
 
 export const SCORING_LOCKED_MESSAGE =

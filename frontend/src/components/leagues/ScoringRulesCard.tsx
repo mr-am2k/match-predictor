@@ -17,6 +17,7 @@ export function ScoringRulesCard({ league }: ScoringRulesCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isOwner = user !== null && league.owner.id === user.id;
+  const isAdmin = user !== null && user.role === 'ADMIN';
 
   const [rules, setRules] = useState<LeagueScoringRulesResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,7 +63,7 @@ export function ScoringRulesCard({ league }: ScoringRulesCardProps) {
             </p>
           </div>
 
-          {isOwner && rules && rules.editable && (
+          {rules && ((isOwner && rules.editable) || isAdmin) && (
             <Button
               variant="outline"
               size="sm"
@@ -73,7 +74,7 @@ export function ScoringRulesCard({ league }: ScoringRulesCardProps) {
             </Button>
           )}
 
-          {isOwner && rules && !rules.editable && (
+          {isOwner && !isAdmin && rules && !rules.editable && (
             <Button
               variant="outline"
               size="sm"

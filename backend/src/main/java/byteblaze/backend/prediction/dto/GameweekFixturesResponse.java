@@ -7,6 +7,7 @@ public record GameweekFixturesResponse(
         String round,
         OffsetDateTime locksAt,
         boolean locked,
+        boolean assistersEnabled,
         List<FixtureWithPrediction> fixtures
 ) {
 }

@@ -13,6 +13,7 @@ import { PlayerMultiSelect } from './PlayerMultiSelect';
 interface MatchPredictionModalProps {
   fixture: FixtureWithPrediction;
   leagueId: string;
+  assistersEnabled: boolean;
   open: boolean;
   onClose: () => void;
   onSaved: (updated: MyPrediction) => void;
@@ -171,6 +172,7 @@ function WinnerPill({
 export function MatchPredictionModal({
   fixture,
   leagueId,
+  assistersEnabled,
   open,
   onClose,
   onSaved,
@@ -308,8 +310,7 @@ export function MatchPredictionModal({
   const pickCapViolation =
     homeScorerOverCap ||
     awayScorerOverCap ||
-    homeAssisterOverCap ||
-    awayAssisterOverCap;
+    (assistersEnabled && (homeAssisterOverCap || awayAssisterOverCap));
 
   const consistencyError = useMemo(() => {
     const homeProvided = homeScore !== '';
@@ -357,7 +358,7 @@ export function MatchPredictionModal({
       homeScore: homeScoreNum,
       awayScore: awayScoreNum,
       scorers: scorerPicks,
-      assisters: assisterPicks,
+      assisters: assistersEnabled ? assisterPicks : [],
     };
 
     try {
@@ -646,6 +647,7 @@ export function MatchPredictionModal({
           </section>
 
           {/* Assisters */}
+          {assistersEnabled && (
           <section>
             <div className="flex items-center justify-between gap-3 mb-3">
               <span className="font-mono text-[0.62rem] tracking-[0.3em] uppercase text-[color:var(--color-volt-200)]">
@@ -721,6 +723,7 @@ export function MatchPredictionModal({
               </div>
             )}
           </section>
+          )}
 
           {errorMessage && (
             <div className="p-4 rounded-xl bg-[color:var(--color-loss-500)]/8 border border-[color:var(--color-loss-500)]/40 text-[color:var(--color-loss-500)] text-sm flex items-start gap-3">

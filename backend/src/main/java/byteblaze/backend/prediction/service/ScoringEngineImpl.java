@@ -54,8 +54,15 @@ public class ScoringEngineImpl implements ScoringEngine {
         List<Map<String, Object>> scorerDetail = new ArrayList<>();
         PickTally scorerTally = scoreScorers(scorers, events, rules, scorerDetail);
 
+        // Per-match assisters are only scored when the league has them enabled.
+        // When disabled they contribute nothing and the match bonus re-tiers to
+        // three categories (winner, exact score, scorer). The breakdown keeps an
+        // (empty) "assisters" key so historical and new JSON share one shape.
+        boolean assistersEnabled = rules.isAssistersEnabled();
         List<Map<String, Object>> assisterDetail = new ArrayList<>();
-        PickTally assisterTally = scoreAssisters(assisters, events, rules, assisterDetail);
+        PickTally assisterTally = assistersEnabled
+                ? scoreAssisters(assisters, events, rules, assisterDetail)
+                : new PickTally(0, false);
 
         int baseTotal = winnerPoints + exactScorePoints + scorerTally.points + assisterTally.points;
 
@@ -63,9 +70,9 @@ public class ScoringEngineImpl implements ScoringEngine {
         if (winnerPoints > 0) categoriesHit++;
         if (exactScorePoints > 0) categoriesHit++;
         if (scorerTally.anyHit) categoriesHit++;
-        if (assisterTally.anyHit) categoriesHit++;
+        if (assistersEnabled && assisterTally.anyHit) categoriesHit++;
 
-        BigDecimal multiplier = resolveMultiplier(categoriesHit, rules);
+        BigDecimal multiplier = resolveMultiplier(categoriesHit, assistersEnabled, rules);
         int total = (int) Math.round(baseTotal * multiplier.doubleValue());
 
         Map<String, Object> breakdown = new LinkedHashMap<>();
@@ -208,8 +215,13 @@ public class ScoringEngineImpl implements ScoringEngine {
         return new PickTally(total, anyHit);
     }
 
-    private static BigDecimal resolveMultiplier(int categoriesHit, LeagueScoringRules rules) {
-        if (categoriesHit >= 4) {
+    private static BigDecimal resolveMultiplier(int categoriesHit, boolean assistersEnabled, LeagueScoringRules rules) {
+        // With assisters enabled a match has 4 categories (winner, exact score,
+        // scorer, assister); without them, 3. In both cases "everything correct"
+        // earns the top bonus (match_bonus_4x). When assisters are disabled,
+        // match_bonus_3x is intentionally orphaned — see the V13 rationale.
+        int maxCategories = assistersEnabled ? 4 : 3;
+        if (categoriesHit >= maxCategories) {
             return rules.getMatchBonus4x();
         }
         if (categoriesHit == 3) {
