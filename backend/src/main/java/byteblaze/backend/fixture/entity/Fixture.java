@@ -59,6 +59,14 @@ public class Fixture {
     @Column(name = "settled_at")
     private LocalDateTime settledAt;
 
+    /**
+     * True once an admin has manually corrected this fixture's result/events.
+     * Such fixtures are skipped by the API-Football sync so the correction
+     * is not overwritten by (potentially wrong) upstream data.
+     */
+    @Column(name = "manually_overridden", nullable = false)
+    private boolean manuallyOverridden;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

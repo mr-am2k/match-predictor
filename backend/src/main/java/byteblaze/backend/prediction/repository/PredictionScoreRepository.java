@@ -12,4 +12,6 @@ import java.util.UUID;
 public interface PredictionScoreRepository extends JpaRepository<PredictionScore, UUID> {
 
     List<PredictionScore> findAllByPredictionIdIn(Collection<UUID> predictionIds);
+
+    void deleteByPredictionIdIn(Collection<UUID> predictionIds);
 }

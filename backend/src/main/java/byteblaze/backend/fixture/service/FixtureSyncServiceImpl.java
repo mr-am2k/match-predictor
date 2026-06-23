@@ -131,6 +131,11 @@ public class FixtureSyncServiceImpl implements FixtureSyncService {
 
         int dispatched = 0;
         for (Fixture fixture : pending) {
+            // Admin-corrected fixtures are settled out-of-band by the manual
+            // edit path; never re-fetch their events or re-dispatch scoring.
+            if (fixture.isManuallyOverridden()) {
+                continue;
+            }
             // If the budget is exhausted we skip dispatch so the fixture stays
             // pending and is retried later, rather than settling it with no events
             // and locking in zero scorer/assister points.
@@ -174,6 +179,13 @@ public class FixtureSyncServiceImpl implements FixtureSyncService {
         }
 
         final Optional<Fixture> existing = fixtureRepository.findById(fixtureId);
+
+        // An admin has manually corrected this fixture — never let the sync
+        // overwrite the corrected score/status/events with upstream data.
+        if (existing.map(Fixture::isManuallyOverridden).orElse(false)) {
+            log.debug("Skipping fixture {}: manually overridden by admin", fixtureId);
+            return null;
+        }
 
         boolean wasPreviouslyFinal = existing
                 .map(f -> f.getStatus() != null && f.getStatus().isFinal())

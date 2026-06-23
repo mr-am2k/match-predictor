@@ -6,6 +6,7 @@ import type {
   SyncStatus,
 } from '../types/admin';
 import type { PageResponse } from '../types/league';
+import { apiFetch } from './http';
 
 const API_BASE = '/api/v1/admin';
 
@@ -18,9 +19,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export async function listAdminCompetitions(): Promise<AdminCompetition[]> {
-  const response = await fetch(`${API_BASE}/competitions`, {
-    credentials: 'include',
-  });
+  const response = await apiFetch(`${API_BASE}/competitions`);
   return handleResponse<AdminCompetition[]>(response);
 }
 
@@ -28,10 +27,9 @@ export async function patchCompetition(
   id: number,
   body: { active?: boolean }
 ): Promise<AdminCompetition> {
-  const response = await fetch(`${API_BASE}/competitions/${id}`, {
+  const response = await apiFetch(`${API_BASE}/competitions/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(body),
   });
   return handleResponse<AdminCompetition>(response);
@@ -58,9 +56,7 @@ export async function listAdminLeagues(params: {
   }
   const qs = query.toString();
   const url = qs ? `${API_BASE}/leagues?${qs}` : `${API_BASE}/leagues`;
-  const response = await fetch(url, {
-    credentials: 'include',
-  });
+  const response = await apiFetch(url);
   return handleResponse<PageResponse<AdminLeague>>(response);
 }
 
@@ -68,26 +64,22 @@ export async function patchLeague(
   id: string,
   body: { archived?: boolean }
 ): Promise<AdminLeague> {
-  const response = await fetch(`${API_BASE}/leagues/${id}`, {
+  const response = await apiFetch(`${API_BASE}/leagues/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(body),
   });
   return handleResponse<AdminLeague>(response);
 }
 
 export async function getSyncStatus(): Promise<SyncStatus> {
-  const response = await fetch(`${API_BASE}/sync/status`, {
-    credentials: 'include',
-  });
+  const response = await apiFetch(`${API_BASE}/sync/status`);
   return handleResponse<SyncStatus>(response);
 }
 
 export async function bootstrapCompetition(id: number): Promise<BootstrapResult> {
-  const response = await fetch(`${API_BASE}/sync/competitions/${id}/bootstrap`, {
+  const response = await apiFetch(`${API_BASE}/sync/competitions/${id}/bootstrap`, {
     method: 'POST',
-    credentials: 'include',
   });
   return handleResponse<BootstrapResult>(response);
 }
@@ -95,8 +87,6 @@ export async function bootstrapCompetition(id: number): Promise<BootstrapResult>
 export async function getApiCallLog(limit: number = 100): Promise<ApiCallLogEntry[]> {
   const query = new URLSearchParams();
   query.set('limit', String(limit));
-  const response = await fetch(`${API_BASE}/budget/log?${query.toString()}`, {
-    credentials: 'include',
-  });
+  const response = await apiFetch(`${API_BASE}/budget/log?${query.toString()}`);
   return handleResponse<ApiCallLogEntry[]>(response);
 }

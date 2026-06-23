@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { ShieldAlert, Trophy, Gauge, Users } from 'lucide-react';
+import { ShieldAlert, Trophy, Gauge, Users, ClipboardEdit } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export function AdminLayout() {
@@ -32,6 +32,7 @@ export function AdminLayout() {
 
   const navItems = [
     { to: '/admin/competitions', label: 'Competitions', icon: Trophy },
+    { to: '/admin/fixtures', label: 'Fixtures', icon: ClipboardEdit },
     { to: '/admin/budget', label: 'Budget', icon: Gauge },
     { to: '/admin/leagues', label: 'Leagues', icon: Users },
   ];

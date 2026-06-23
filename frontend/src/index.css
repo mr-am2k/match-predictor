@@ -316,6 +316,21 @@ input, select, textarea {
   color-scheme: dark;
 }
 
+/* Admin dark <select> — used across the admin console editors */
+.admin-select {
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  background-color: var(--color-ink-800);
+  border: 1px solid var(--color-ink-600);
+  color: var(--color-ink-50);
+  font-size: 0.875rem;
+}
+.admin-select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-volt-200) 60%, transparent);
+}
+
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
