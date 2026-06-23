@@ -15,6 +15,7 @@ import { BrowseLeaguesPage } from './pages/BrowseLeaguesPage';
 import { OverallPredictionPage } from './pages/OverallPredictionPage';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { AdminCompetitionsPage } from './pages/admin/AdminCompetitionsPage';
+import { AdminFixturesPage } from './pages/admin/AdminFixturesPage';
 import { AdminBudgetPage } from './pages/admin/AdminBudgetPage';
 import { AdminLeaguesPage } from './pages/admin/AdminLeaguesPage';
 
@@ -99,6 +100,7 @@ function App() {
               }
             >
               <Route path="/admin/competitions" element={<AdminCompetitionsPage />} />
+              <Route path="/admin/fixtures" element={<AdminFixturesPage />} />
               <Route path="/admin/budget" element={<AdminBudgetPage />} />
               <Route path="/admin/leagues" element={<AdminLeaguesPage />} />
             </Route>

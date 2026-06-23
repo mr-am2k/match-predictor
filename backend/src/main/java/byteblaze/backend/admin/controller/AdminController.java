@@ -50,7 +50,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminController {
 
-    private AdminService adminService;
+    private final AdminService adminService;
 
     @GetMapping("/competitions")
     public List<AdminCompetitionResponse> listCompetitions() {
