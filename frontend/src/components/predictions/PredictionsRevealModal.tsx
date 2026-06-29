@@ -325,6 +325,14 @@ function PredictionSlip({
                 Exact
               </span>
             )}
+            {outcome === 'draw' && prediction.penaltyWinnerTeamId != null && (
+              <span className="chip chip-draw">
+                Pens:{' '}
+                {prediction.penaltyWinnerTeamId === fixture.homeTeam.id
+                  ? fixture.homeTeam.name
+                  : fixture.awayTeam.name}
+              </span>
+            )}
           </div>
         </div>
 

@@ -15,6 +15,7 @@ import java.util.List;
 public record ScoreBreakdown(
         int winnerPoints,
         int scorePoints,
+        int penaltyPoints,
         List<ScoreLine> scorers,
         List<ScoreLine> assisters,
         int categoriesHit,

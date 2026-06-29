@@ -13,6 +13,7 @@ public record OtherPrediction(
         boolean isCurrentUser,
         Long winnerTeamId,
         boolean predictedDraw,
+        Long penaltyWinnerTeamId,
         Integer homeScore,
         Integer awayScore,
         List<PlayerPickView> scorers,

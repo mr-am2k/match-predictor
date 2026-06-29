@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -54,6 +55,7 @@ public class LeagueScoringRulesServiceImpl implements LeagueScoringRulesService 
     private static final BigDecimal DEFAULT_MATCH_BONUS_4X = new BigDecimal("3.00");
     private static final BigDecimal DEFAULT_LEAGUE_BONUS_2OF3 = new BigDecimal("1.50");
     private static final BigDecimal DEFAULT_LEAGUE_BONUS_3OF3 = new BigDecimal("3.00");
+    private static final int DEFAULT_PENALTY_WINNER_POINTS = 5;
 
     @Override
     @Transactional(readOnly = true)
@@ -98,6 +100,33 @@ public class LeagueScoringRulesServiceImpl implements LeagueScoringRulesService 
 
         // Same editability check the GET computes; it can only flip to false
         // between requests, never back to true, so we can just re-emit.
+        return toResponse(rules, computeEditable(leagueId));
+    }
+
+    @Override
+    @Transactional
+    public LeagueScoringRulesResponse setPenaltiesEnabled(UUID leagueId, boolean enabled, User currentUser) {
+        League league = leagueRepo.findById(leagueId)
+                .orElseThrow(() -> new LeagueNotFoundException("League not found: " + leagueId));
+
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN;
+        if (!isAdmin && !league.getOwner().getId().equals(currentUser.getId())) {
+            log.debug("User {} attempted to toggle penalties for league {} (not owner, not admin)",
+                    currentUser.getId(), leagueId);
+            throw new OnlyOwnerCanEditScoringRulesException();
+        }
+
+        // Deliberately NOT gated by computeEditable(): the whole point is to let an
+        // owner switch penalties on after group-stage predictions already exist.
+        LeagueScoringRules rules = rulesRepo.findById(leagueId).orElseGet(() -> buildDefaults(leagueId));
+        rules.setPenaltiesEnabled(enabled);
+        if (enabled) {
+            // (Re-)stamp on each enable so scoring only ever applies to fixtures
+            // whose prediction window is still open at this moment.
+            rules.setPenaltiesEnabledAt(LocalDateTime.now());
+        }
+        rules = rulesRepo.save(rules);
+
         return toResponse(rules, computeEditable(leagueId));
     }
 
@@ -159,6 +188,8 @@ public class LeagueScoringRulesServiceImpl implements LeagueScoringRulesService 
                 .leagueBonus2of3(DEFAULT_LEAGUE_BONUS_2OF3)
                 .leagueBonus3of3(DEFAULT_LEAGUE_BONUS_3OF3)
                 .assistersEnabled(true)
+                .penaltiesEnabled(false)
+                .penaltyWinnerPoints(DEFAULT_PENALTY_WINNER_POINTS)
                 .build();
     }
 
@@ -181,6 +212,10 @@ public class LeagueScoringRulesServiceImpl implements LeagueScoringRulesService 
         rules.setLeagueBonus3of3(body.leagueBonus3of3());
         // Null (older clients / league creation) means "leave assisters enabled".
         rules.setAssistersEnabled(body.assistersEnabled() == null || body.assistersEnabled());
+        // Penalty points: null means keep/seed the default. The penaltiesEnabled
+        // toggle is intentionally NOT set here — it has its own freeze-exempt path.
+        rules.setPenaltyWinnerPoints(
+                body.penaltyWinnerPoints() == null ? DEFAULT_PENALTY_WINNER_POINTS : body.penaltyWinnerPoints());
     }
 
     private static LeagueScoringRulesResponse toResponse(LeagueScoringRules rules, boolean editable) {
@@ -198,6 +233,8 @@ public class LeagueScoringRulesServiceImpl implements LeagueScoringRulesService 
                 rules.getLeagueBonus2of3(),
                 rules.getLeagueBonus3of3(),
                 rules.isAssistersEnabled(),
+                rules.isPenaltiesEnabled(),
+                rules.getPenaltyWinnerPoints(),
                 editable
         );
     }

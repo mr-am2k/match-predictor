@@ -14,6 +14,12 @@ export interface LeagueScoringRules {
   // Per-match assister toggle (V13). When false, assisters are hidden from the
   // prediction UI and excluded from scoring going forward.
   assistersEnabled: boolean;
+  // Knockout penalties toggle (V15). When true, a draw prediction on a knockout
+  // fixture can also pick who wins the shootout, scored as a separate category.
+  // Flipped via a dedicated endpoint, so it works even after the rest of the
+  // rules are frozen.
+  penaltiesEnabled: boolean;
+  penaltyWinnerPoints: number;
 }
 
 export interface LeagueScoringRulesResponse extends LeagueScoringRules {
@@ -34,6 +40,8 @@ export const DEFAULT_SCORING_RULES: LeagueScoringRules = {
   leagueBonus2of3: 1.5,
   leagueBonus3of3: 3,
   assistersEnabled: true,
+  penaltiesEnabled: false,
+  penaltyWinnerPoints: 5,
 };
 
 export const SCORING_LOCKED_MESSAGE =
@@ -54,6 +62,7 @@ const SCORING_FIELD_SPECS: FieldSpec[] = [
   { field: 'matchExactScorePoints', min: 0, max: 50, isDecimal: false, label: 'Match exact score points' },
   { field: 'matchScorerPoints', min: 0, max: 50, isDecimal: false, label: 'Match scorer points' },
   { field: 'matchAssisterPoints', min: 0, max: 50, isDecimal: false, label: 'Match assister points' },
+  { field: 'penaltyWinnerPoints', min: 0, max: 50, isDecimal: false, label: 'Penalty winner points' },
   { field: 'leagueWinnerPoints', min: 0, max: 100, isDecimal: false, label: 'League winner points' },
   { field: 'leagueTopScorerPoints', min: 0, max: 100, isDecimal: false, label: 'Top scorer points' },
   { field: 'leagueTopAssisterPoints', min: 0, max: 100, isDecimal: false, label: 'Top assister points' },

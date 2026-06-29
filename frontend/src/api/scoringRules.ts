@@ -37,6 +37,9 @@ function normalizeResponse(raw: LeagueScoringRulesResponse): LeagueScoringRulesR
     leagueBonus3of3: Number(raw.leagueBonus3of3),
     // Absent on legacy responses → treat as enabled.
     assistersEnabled: raw.assistersEnabled !== false,
+    // Absent on legacy responses → penalties off, default points.
+    penaltiesEnabled: Boolean(raw.penaltiesEnabled),
+    penaltyWinnerPoints: Number(raw.penaltyWinnerPoints ?? 5),
     editable: Boolean(raw.editable),
   };
 }
@@ -60,6 +63,24 @@ export async function updateScoringRules(
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify(body),
+  });
+  const data = await handleResponse<LeagueScoringRulesResponse>(response);
+  return normalizeResponse(data);
+}
+
+/**
+ * Flip the knockout-penalties toggle. Uses a dedicated endpoint that is NOT
+ * blocked by the post-prediction freeze, so an owner can enable it mid-season.
+ */
+export async function setPenaltiesEnabled(
+  leagueId: string,
+  enabled: boolean
+): Promise<LeagueScoringRulesResponse> {
+  const response = await fetch(`${API_BASE}/${leagueId}/scoring-rules/penalties`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ enabled }),
   });
   const data = await handleResponse<LeagueScoringRulesResponse>(response);
   return normalizeResponse(data);

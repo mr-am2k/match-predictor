@@ -53,6 +53,17 @@ public record LeagueScoringRulesRequest(
         // Per-match assister toggle (V13). Nullable for backward compatibility —
         // older clients and the league-creation flow may omit it, in which case
         // it is treated as enabled (true). See LeagueScoringRulesServiceImpl.
-        Boolean assistersEnabled
+        Boolean assistersEnabled,
+
+        // Knockout penalty-winner points (V15). Nullable for backward
+        // compatibility — defaults to 5 when omitted.
+        @Min(0) @Max(50)
+        Integer penaltyWinnerPoints,
+
+        // Accepted but IGNORED here: the penalties toggle is changed via
+        // PATCH .../scoring-rules/penalties so it can be flipped after the rest of
+        // the rules freeze. Present only so the full-rules PUT tolerates clients
+        // that echo it back in the body.
+        Boolean penaltiesEnabled
 ) {
 }

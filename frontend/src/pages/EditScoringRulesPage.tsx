@@ -8,7 +8,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getLeague } from '../api/leagues';
-import { getScoringRules, updateScoringRules } from '../api/scoringRules';
+import { getScoringRules, updateScoringRules, setPenaltiesEnabled } from '../api/scoringRules';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../components/ui/Card';
 import { ScoringRulesTable } from '../components/leagues/ScoringRulesTable';
@@ -65,6 +65,8 @@ export function EditScoringRulesPage() {
           leagueBonus2of3: rulesData.leagueBonus2of3,
           leagueBonus3of3: rulesData.leagueBonus3of3,
           assistersEnabled: rulesData.assistersEnabled,
+          penaltiesEnabled: rulesData.penaltiesEnabled,
+          penaltyWinnerPoints: rulesData.penaltyWinnerPoints,
         });
       })
       .catch((err: unknown) => {
@@ -105,9 +107,35 @@ export function EditScoringRulesPage() {
         leagueBonus2of3: fresh.leagueBonus2of3,
         leagueBonus3of3: fresh.leagueBonus3of3,
         assistersEnabled: fresh.assistersEnabled,
+        penaltiesEnabled: fresh.penaltiesEnabled,
+        penaltyWinnerPoints: fresh.penaltyWinnerPoints,
       });
     } catch {
       // swallow; user sees the existing banner
+    }
+  };
+
+  const handleTogglePenalties = async (enabled: boolean) => {
+    if (!id) return;
+    setSaveError(null);
+    setSuccessMessage(null);
+    try {
+      const updated = await setPenaltiesEnabled(id, enabled);
+      setRules(updated);
+      setDraft((prev) =>
+        prev
+          ? {
+              ...prev,
+              penaltiesEnabled: updated.penaltiesEnabled,
+              penaltyWinnerPoints: updated.penaltyWinnerPoints,
+            }
+          : prev
+      );
+      setSuccessMessage(
+        enabled ? 'Knockout penalties enabled.' : 'Knockout penalties disabled.'
+      );
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to update penalties');
     }
   };
 
@@ -257,6 +285,7 @@ export function EditScoringRulesPage() {
               onChange={setDraft}
               readOnly={readOnly}
               errors={errors}
+              onTogglePenalties={canEdit ? handleTogglePenalties : undefined}
             />
           </CardContent>
         </Card>

@@ -82,6 +82,23 @@ public class LeagueScoringRules {
     @Column(name = "assisters_enabled", nullable = false)
     private boolean assistersEnabled;
 
+    /**
+     * Whether knockout penalty-shootout predictions are scored for this league
+     * (V15). Unlike the other rules, this toggle is NOT frozen once predictions
+     * exist — an owner can switch it on mid-season. {@link #penaltiesEnabledAt}
+     * records when, and the scoring engine only awards penalty points for
+     * fixtures whose prediction window was still open at that moment, so
+     * already-locked/played matches are never affected.
+     */
+    @Column(name = "penalties_enabled", nullable = false)
+    private boolean penaltiesEnabled;
+
+    @Column(name = "penalty_winner_points", nullable = false)
+    private int penaltyWinnerPoints;
+
+    @Column(name = "penalties_enabled_at")
+    private LocalDateTime penaltiesEnabledAt;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

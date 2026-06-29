@@ -14,6 +14,7 @@ interface MatchPredictionModalProps {
   fixture: FixtureWithPrediction;
   leagueId: string;
   assistersEnabled: boolean;
+  penaltiesEnabled: boolean;
   open: boolean;
   onClose: () => void;
   onSaved: (updated: MyPrediction) => void;
@@ -173,6 +174,7 @@ export function MatchPredictionModal({
   fixture,
   leagueId,
   assistersEnabled,
+  penaltiesEnabled,
   open,
   onClose,
   onSaved,
@@ -196,6 +198,9 @@ export function MatchPredictionModal({
   );
   const [assisterPicks, setAssisterPicks] = useState<PlayerPick[]>(
     initialPrediction?.assisters ?? []
+  );
+  const [penaltyWinnerTeamId, setPenaltyWinnerTeamId] = useState<number | null>(
+    initialPrediction?.penaltyWinnerTeamId ?? null
   );
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -225,6 +230,7 @@ export function MatchPredictionModal({
     );
     setScorerPicks(fixture.userPrediction?.scorers ?? []);
     setAssisterPicks(fixture.userPrediction?.assisters ?? []);
+    setPenaltyWinnerTeamId(fixture.userPrediction?.penaltyWinnerTeamId ?? null);
     setErrorMessage(null);
     setIsLockedError(false);
     setSubmitting(false);
@@ -336,6 +342,12 @@ export function MatchPredictionModal({
 
   if (!open) return null;
 
+  // Knockout penalty pick: offered only when the league has penalties on, this
+  // is a knockout fixture, and the user is predicting a draw (the only outcome
+  // that can go to a shootout). Independent of the score, so never disabled.
+  const showPenaltyPicker =
+    penaltiesEnabled && fixture.knockout && winnerChoice === 'DRAW';
+
   const saveDisabled =
     submitting || consistencyError !== null || isLockedError || pickCapViolation;
 
@@ -355,6 +367,7 @@ export function MatchPredictionModal({
     const body: UpsertPredictionRequest = {
       winnerTeamId,
       predictedDraw,
+      penaltyWinnerTeamId: showPenaltyPicker ? penaltyWinnerTeamId : null,
       homeScore: homeScoreNum,
       awayScore: awayScoreNum,
       scorers: scorerPicks,
@@ -532,6 +545,45 @@ export function MatchPredictionModal({
               </p>
             )}
           </section>
+
+          {/* Penalty shootout winner — knockout draws only */}
+          {showPenaltyPicker && (
+            <section>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="font-mono text-[0.62rem] tracking-[0.3em] uppercase text-[color:var(--color-volt-200)]">
+                  / Wins on penalties
+                </span>
+                {penaltyWinnerTeamId !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setPenaltyWinnerTeamId(null)}
+                    className="ml-auto font-mono text-[0.6rem] tracking-[0.2em] uppercase text-[color:var(--color-ink-400)] hover:text-[color:var(--color-ink-100)] transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <WinnerPill
+                  active={penaltyWinnerTeamId === fixture.homeTeam.id}
+                  onClick={() => setPenaltyWinnerTeamId(fixture.homeTeam.id)}
+                  tone="home"
+                >
+                  {fixture.homeTeam.name}
+                </WinnerPill>
+                <WinnerPill
+                  active={penaltyWinnerTeamId === fixture.awayTeam.id}
+                  onClick={() => setPenaltyWinnerTeamId(fixture.awayTeam.id)}
+                  tone="away"
+                >
+                  {fixture.awayTeam.name}
+                </WinnerPill>
+              </div>
+              <p className="mt-2 font-mono text-[0.58rem] tracking-[0.16em] uppercase text-[color:var(--color-ink-400)]">
+                Optional — scores if the tie goes to a shootout
+              </p>
+            </section>
+          )}
 
           {/* Score */}
           <section>

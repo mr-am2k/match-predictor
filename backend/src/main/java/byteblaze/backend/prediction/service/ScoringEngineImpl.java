@@ -3,6 +3,7 @@ package byteblaze.backend.prediction.service;
 import byteblaze.backend.fixture.entity.Fixture;
 import byteblaze.backend.fixture.entity.FixtureEvent;
 import byteblaze.backend.fixture.entity.FixtureEventType;
+import byteblaze.backend.fixture.entity.FixtureStatus;
 import byteblaze.backend.prediction.dto.PlayerPick;
 import byteblaze.backend.prediction.entity.Prediction;
 import byteblaze.backend.scoring.rules.entity.LeagueScoringRules;
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -66,18 +68,35 @@ public class ScoringEngineImpl implements ScoringEngine {
 
         int baseTotal = winnerPoints + exactScorePoints + scorerTally.points + assisterTally.points;
 
+        // Knockout penalty-shootout pick. A separate scoring category, only live
+        // when the league has penalties enabled AND this fixture's prediction
+        // window was still open when the owner turned them on (the V15 "only
+        // affect upcoming matches" gate). Awarded when the match was decided on
+        // penalties (status PEN) and the user named the team that advanced.
+        boolean penaltyEligible = penaltyEligibleForFixture(fixture, rules);
+        int penaltyPoints = 0;
+        if (penaltyEligible
+                && fixture.getStatus() == FixtureStatus.PEN
+                && prediction.getPenaltyWinnerTeamId() != null
+                && prediction.getPenaltyWinnerTeamId().equals(shootoutWinner(fixture))) {
+            penaltyPoints = rules.getPenaltyWinnerPoints();
+        }
+        baseTotal += penaltyPoints;
+
         int categoriesHit = 0;
         if (winnerPoints > 0) categoriesHit++;
         if (exactScorePoints > 0) categoriesHit++;
         if (scorerTally.anyHit) categoriesHit++;
         if (assistersEnabled && assisterTally.anyHit) categoriesHit++;
+        if (penaltyPoints > 0) categoriesHit++;
 
-        BigDecimal multiplier = resolveMultiplier(categoriesHit, assistersEnabled, rules);
+        BigDecimal multiplier = resolveMultiplier(categoriesHit, assistersEnabled, penaltyEligible, rules);
         int total = (int) Math.round(baseTotal * multiplier.doubleValue());
 
         Map<String, Object> breakdown = new LinkedHashMap<>();
         breakdown.put("winner", winnerPoints);
         breakdown.put("score", exactScorePoints);
+        breakdown.put("penalty", penaltyPoints);
         breakdown.put("scorers", scorerDetail);
         breakdown.put("assisters", assisterDetail);
         breakdown.put("categoriesHit", categoriesHit);
@@ -217,13 +236,52 @@ public class ScoringEngineImpl implements ScoringEngine {
         return new PickTally(total, anyHit);
     }
 
-    private static BigDecimal resolveMultiplier(int categoriesHit, boolean assistersEnabled, LeagueScoringRules rules) {
-        // With assisters enabled a match has 4 categories (winner, exact score,
-        // scorer, assister); without them, 3. In both cases "everything correct"
-        // earns the top bonus (match_bonus_4x). When assisters are disabled,
-        // match_bonus_3x is intentionally orphaned — see the V13 rationale.
-        int maxCategories = assistersEnabled ? 4 : 3;
-        if (categoriesHit >= maxCategories) {
+    /**
+     * Whether the penalty category may be scored for this fixture: penalties are
+     * enabled for the league and the fixture's lock time (kickoff − 15m) had not
+     * yet passed when the owner enabled them. This is what keeps enabling
+     * penalties mid-season from retroactively touching already-locked matches.
+     */
+    private static boolean penaltyEligibleForFixture(Fixture fixture, LeagueScoringRules rules) {
+        if (!rules.isPenaltiesEnabled() || rules.getPenaltiesEnabledAt() == null) {
+            return false;
+        }
+        if (fixture.getKickoffAt() == null) {
+            return false;
+        }
+        OffsetDateTime enabledAt = rules.getPenaltiesEnabledAt().atOffset(ZoneOffset.UTC);
+        OffsetDateTime locksAt = fixture.getKickoffAt().minusMinutes(15);
+        return locksAt.isAfter(enabledAt);
+    }
+
+    /** The team that won the shootout (higher penalty score), or null. */
+    private static Long shootoutWinner(Fixture fixture) {
+        Integer home = fixture.getPenaltyHomeScore();
+        Integer away = fixture.getPenaltyAwayScore();
+        if (home == null || away == null) {
+            return null;
+        }
+        if (home > away) {
+            return fixture.getHomeTeamId();
+        }
+        if (away > home) {
+            return fixture.getAwayTeamId();
+        }
+        return null;
+    }
+
+    private static BigDecimal resolveMultiplier(int categoriesHit,
+                                                boolean assistersEnabled,
+                                                boolean penaltiesEnabled,
+                                                LeagueScoringRules rules) {
+        // Categories: winner, exact score, scorer (3) + assister (if enabled)
+        // + penalty (if enabled for this fixture). Per the knockout spec the tiers
+        // stay 2x/3x/4x: 4 OR MORE correct categories earns the top match_bonus_4x
+        // (no 5x tier). Hitting every available category also earns the top bonus —
+        // so when assisters are disabled, 3-of-3 still maps to 4x and match_bonus_3x
+        // is intentionally orphaned (see the V13 rationale).
+        int maxCategories = 3 + (assistersEnabled ? 1 : 0) + (penaltiesEnabled ? 1 : 0);
+        if (categoriesHit >= 4 || categoriesHit >= maxCategories) {
             return rules.getMatchBonus4x();
         }
         if (categoriesHit == 3) {

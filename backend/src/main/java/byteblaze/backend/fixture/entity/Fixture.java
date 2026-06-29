@@ -53,6 +53,17 @@ public class Fixture {
     @Column(name = "winner_team_id")
     private Long winnerTeamId;
 
+    /**
+     * Penalty-shootout score (only set when {@code status == PEN}). The team with
+     * the higher value advances; {@link #winnerTeamId} is set to that team so the
+     * shootout winner is derivable without re-deriving it everywhere.
+     */
+    @Column(name = "penalty_home_score")
+    private Integer penaltyHomeScore;
+
+    @Column(name = "penalty_away_score")
+    private Integer penaltyAwayScore;
+
     @Column(name = "last_synced_at")
     private LocalDateTime lastSyncedAt;
 

@@ -38,6 +38,14 @@ public class Prediction {
     @Column(name = "predicted_draw", nullable = false)
     private boolean predictedDraw;
 
+    /**
+     * Who the user thinks wins the penalty shootout. Only meaningful when
+     * {@link #predictedDraw} is true and the fixture is a knockout match in a
+     * penalties-enabled league (see {@code V15__knockout_penalties.sql}).
+     */
+    @Column(name = "penalty_winner_team_id")
+    private Long penaltyWinnerTeamId;
+
     @Column(name = "home_score")
     private Integer homeScore;
 
