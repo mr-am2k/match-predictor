@@ -161,8 +161,14 @@ public class FixtureAdminServiceImpl implements FixtureAdminService {
 
         fixture.setHomeScore(request.homeScore());
         fixture.setAwayScore(request.awayScore());
+        // Penalty shootout result (only meaningful when status == PEN). Persisted so
+        // the scoring engine can score knockout penalty-winner predictions.
+        fixture.setPenaltyHomeScore(request.penaltyHomeScore());
+        fixture.setPenaltyAwayScore(request.penaltyAwayScore());
         fixture.setStatus(status);
-        fixture.setWinnerTeamId(resolveWinnerTeamId(fixture, request.homeScore(), request.awayScore(), status));
+        fixture.setWinnerTeamId(resolveWinnerTeamId(
+                fixture, request.homeScore(), request.awayScore(),
+                request.penaltyHomeScore(), request.penaltyAwayScore(), status));
         fixture.setManuallyOverridden(true);
         fixtureRepository.save(fixture);
 
@@ -257,12 +263,18 @@ public class FixtureAdminServiceImpl implements FixtureAdminService {
         }
     }
 
-    private static Long resolveWinnerTeamId(Fixture fixture, Integer homeScore, Integer awayScore, FixtureStatus status) {
+    private static Long resolveWinnerTeamId(Fixture fixture, Integer homeScore, Integer awayScore,
+                                            Integer penaltyHome, Integer penaltyAway, FixtureStatus status) {
         if (!status.isFinal() || homeScore == null || awayScore == null) {
             return null;
         }
         if (homeScore > awayScore) return fixture.getHomeTeamId();
         if (awayScore > homeScore) return fixture.getAwayTeamId();
+        // Level after 120' decided on penalties — winner is the higher shootout score.
+        if (status == FixtureStatus.PEN && penaltyHome != null && penaltyAway != null) {
+            if (penaltyHome > penaltyAway) return fixture.getHomeTeamId();
+            if (penaltyAway > penaltyHome) return fixture.getAwayTeamId();
+        }
         return null;
     }
 

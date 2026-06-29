@@ -19,6 +19,8 @@ public record EditFixtureResultRequest(
         @NotNull @PositiveOrZero Integer homeScore,
         @NotNull @PositiveOrZero Integer awayScore,
         FixtureStatus status,
+        @PositiveOrZero Integer penaltyHomeScore,
+        @PositiveOrZero Integer penaltyAwayScore,
         @Valid List<ScorerInput> scorers,
         @Valid List<AssisterInput> assisters
 ) {

@@ -3,12 +3,14 @@ package byteblaze.backend.scoring.rules.controller;
 import byteblaze.backend.auth.entity.User;
 import byteblaze.backend.scoring.rules.dto.LeagueScoringRulesRequest;
 import byteblaze.backend.scoring.rules.dto.LeagueScoringRulesResponse;
+import byteblaze.backend.scoring.rules.dto.SetPenaltiesEnabledRequest;
 import byteblaze.backend.scoring.rules.service.LeagueScoringRulesService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -39,5 +41,14 @@ public class LeagueScoringRulesController {
             @AuthenticationPrincipal User currentUser
     ) {
         return ResponseEntity.ok(service.update(leagueId, body, currentUser));
+    }
+
+    @PatchMapping("/penalties")
+    public ResponseEntity<LeagueScoringRulesResponse> setPenaltiesEnabled(
+            @PathVariable UUID leagueId,
+            @Valid @RequestBody SetPenaltiesEnabledRequest body,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(service.setPenaltiesEnabled(leagueId, body.enabled(), currentUser));
     }
 }

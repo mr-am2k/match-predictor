@@ -339,6 +339,7 @@ export function GameweekPredictionsPage() {
           fixture={editingFixture}
           leagueId={id}
           assistersEnabled={fixturesData?.assistersEnabled ?? true}
+          penaltiesEnabled={fixturesData?.penaltiesEnabled ?? false}
           open={true}
           onClose={() => setEditingFixtureId(null)}
           onSaved={handlePredictionSaved}

@@ -98,6 +98,9 @@ export function PointsBreakdown({
   const hasBonus = breakdown.multiplier > 1;
   const winnerHit = breakdown.winnerPoints > 0;
   const exactHit = breakdown.scorePoints > 0;
+  const penaltyHit = breakdown.penaltyPoints > 0;
+  // Most matches have 4 categories; a knockout penalty pick adds a 5th.
+  const categoryTotal = Math.max(4, breakdown.categoriesHit);
 
   return (
     <div className="rounded-xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-900)]/50 overflow-hidden">
@@ -143,6 +146,9 @@ export function PointsBreakdown({
           <div className="px-4 py-1 divide-y divide-[color:var(--color-ink-800)]">
             <CategoryRow label="Winner" hit={winnerHit} points={breakdown.winnerPoints} />
             <CategoryRow label="Exact score" hit={exactHit} points={breakdown.scorePoints} />
+            {penaltyHit && (
+              <CategoryRow label="Penalty winner" hit={penaltyHit} points={breakdown.penaltyPoints} />
+            )}
             {breakdown.scorers.map((line) => (
               <PlayerRow key={`s-${line.playerId}`} line={line} kind="goal" />
             ))}
@@ -163,11 +169,11 @@ export function PointsBreakdown({
             {hasBonus ? (
               <span className="chip chip-volt">
                 <Zap className="w-3 h-3" />×{fmtMultiplier(breakdown.multiplier)} bonus ·{' '}
-                {breakdown.categoriesHit} of 4
+                {breakdown.categoriesHit} of {categoryTotal}
               </span>
             ) : (
               <span className="font-mono text-[0.55rem] tracking-[0.16em] uppercase text-[color:var(--color-ink-500)]">
-                {breakdown.categoriesHit} of 4 hit
+                {breakdown.categoriesHit} of {categoryTotal} hit
               </span>
             )}
           </div>

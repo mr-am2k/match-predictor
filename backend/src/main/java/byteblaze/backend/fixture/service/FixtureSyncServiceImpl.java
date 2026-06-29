@@ -227,10 +227,14 @@ public class FixtureSyncServiceImpl implements FixtureSyncService {
 
         final Integer homeScore = resolveScore(row, true);
         final Integer awayScore = resolveScore(row, false);
+        final Integer penaltyHome = resolvePenaltyScore(row, true);
+        final Integer penaltyAway = resolvePenaltyScore(row, false);
 
         fixture.setHomeScore(homeScore);
         fixture.setAwayScore(awayScore);
-        fixture.setWinnerTeamId(resolveWinnerTeamId(fixture, homeScore, awayScore, newStatus));
+        fixture.setPenaltyHomeScore(penaltyHome);
+        fixture.setPenaltyAwayScore(penaltyAway);
+        fixture.setWinnerTeamId(resolveWinnerTeamId(fixture, homeScore, awayScore, penaltyHome, penaltyAway, newStatus));
         fixture.setLastSyncedAt(LocalDateTime.now());
 
         fixtureRepository.save(fixture);
@@ -335,23 +339,36 @@ public class FixtureSyncServiceImpl implements FixtureSyncService {
     }
 
     private Integer resolveScore(FixturesResponse.FixtureRow row, boolean home) {
-        if (row.score() != null && row.score().fulltime() != null) {
-            final Integer value = home ? row.score().fulltime().home() : row.score().fulltime().away();
+        // Prefer the top-level goals — the final result after extra time, excluding
+        // the penalty shootout — so a knockout match stores its 120' result rather
+        // than the 90' fulltime score. Fall back to fulltime only when goals is
+        // absent (e.g. a not-yet-started fixture API quirk).
+        if (row.goals() != null) {
+            final Integer value = home ? row.goals().home() : row.goals().away();
             if (value != null) {
                 return value;
             }
         }
 
-        if (row.goals() != null) {
-            return home ? row.goals().home() : row.goals().away();
+        if (row.score() != null && row.score().fulltime() != null) {
+            return home ? row.score().fulltime().home() : row.score().fulltime().away();
         }
 
+        return null;
+    }
+
+    private Integer resolvePenaltyScore(FixturesResponse.FixtureRow row, boolean home) {
+        if (row.score() != null && row.score().penalty() != null) {
+            return home ? row.score().penalty().home() : row.score().penalty().away();
+        }
         return null;
     }
 
     private Long resolveWinnerTeamId(Fixture fixture,
                                      Integer homeScore,
                                      Integer awayScore,
+                                     Integer penaltyHome,
+                                     Integer penaltyAway,
                                      FixtureStatus status) {
         if (!status.isFinal() || homeScore == null || awayScore == null) {
             return null;
@@ -363,6 +380,17 @@ public class FixtureSyncServiceImpl implements FixtureSyncService {
 
         if (awayScore > homeScore) {
             return fixture.getAwayTeamId();
+        }
+
+        // Level after 120' (extra time) — the tie was decided on penalties. The
+        // team with the higher shootout score advances and is the fixture winner.
+        if (status == FixtureStatus.PEN && penaltyHome != null && penaltyAway != null) {
+            if (penaltyHome > penaltyAway) {
+                return fixture.getHomeTeamId();
+            }
+            if (penaltyAway > penaltyHome) {
+                return fixture.getAwayTeamId();
+            }
         }
 
         return null;

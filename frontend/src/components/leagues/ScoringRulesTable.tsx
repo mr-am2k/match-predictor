@@ -7,6 +7,10 @@ interface ScoringRulesTableProps {
   onChange: (next: LeagueScoringRules) => void;
   readOnly?: boolean;
   errors?: Partial<Record<keyof LeagueScoringRules, string>>;
+  // When provided, the knockout-penalties toggle is interactive (even while the
+  // numeric rules are frozen) and flips via this callback, which hits the
+  // dedicated PATCH endpoint. Omit it to render the toggle as a read-only badge.
+  onTogglePenalties?: (enabled: boolean) => void;
 }
 
 // Numeric rule fields only — excludes the boolean `assistersEnabled`, which is
@@ -69,6 +73,14 @@ const SECTIONS: Section[] = [
         field: 'matchAssisterPoints',
         label: 'Each correct assister',
         description: 'Per assister you correctly predicted (up to 3 per match).',
+        min: 0,
+        max: 50,
+        isDecimal: false,
+      },
+      {
+        field: 'penaltyWinnerPoints',
+        label: 'Correct penalty winner',
+        description: 'Knockout only: awarded when you predict a draw and name the team that wins the shootout. Counts as a separate bonus category.',
         min: 0,
         max: 50,
         isDecimal: false,
@@ -177,6 +189,7 @@ export function ScoringRulesTable({
   onChange,
   readOnly = false,
   errors,
+  onTogglePenalties,
 }: ScoringRulesTableProps) {
   const handleFieldChange = (field: Field, raw: string, isDecimal: boolean) => {
     if (raw === '') {
@@ -252,6 +265,54 @@ export function ScoringRulesTable({
                 }`}
               />
             </button>
+          )}
+        </div>
+      </div>
+
+      {/* Knockout penalties — togglable even when the numeric rules are frozen */}
+      <div className="rounded-xl border border-[color:var(--color-ink-700)] bg-[color:var(--color-ink-850)]/60 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-base tracking-wide uppercase text-[color:var(--color-ink-50)]">
+              Knockout penalties
+            </p>
+            <p className="text-xs text-[color:var(--color-ink-300)] leading-relaxed mt-1">
+              On knockout fixtures, members who predict a draw can also pick who wins the shootout,
+              scored as a separate bonus category. You can switch this on mid-season — it only affects
+              matches still open when you enable it; locked and settled matches are untouched.
+            </p>
+          </div>
+          {onTogglePenalties ? (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={value.penaltiesEnabled}
+              aria-label="Toggle knockout penalties"
+              onClick={() => onTogglePenalties(!value.penaltiesEnabled)}
+              className={`flex-shrink-0 relative inline-flex h-6 w-11 items-center rounded-full border transition-colors ${
+                value.penaltiesEnabled
+                  ? 'bg-[color:var(--color-volt-200)]/80 border-[color:var(--color-volt-200)]'
+                  : 'bg-[color:var(--color-ink-800)] border-[color:var(--color-ink-600)]'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-[color:var(--color-ink-950)] transition-transform ${
+                  value.penaltiesEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          ) : (
+            <div className="flex-shrink-0 text-right">
+              <span
+                className={`inline-flex items-center px-3 py-1.5 rounded-lg border font-mono text-[0.6rem] tracking-[0.2em] uppercase ${
+                  value.penaltiesEnabled
+                    ? 'border-[color:var(--color-volt-200)]/30 bg-[color:var(--color-volt-200)]/5 text-[color:var(--color-volt-200)]'
+                    : 'border-[color:var(--color-ink-600)] bg-[color:var(--color-ink-800)] text-[color:var(--color-ink-400)]'
+                }`}
+              >
+                {value.penaltiesEnabled ? 'On' : 'Off'}
+              </span>
+            </div>
           )}
         </div>
       </div>

@@ -8,6 +8,7 @@ public record GameweekFixturesResponse(
         OffsetDateTime locksAt,
         boolean locked,
         boolean assistersEnabled,
+        boolean penaltiesEnabled,
         List<FixtureWithPrediction> fixtures
 ) {
 }

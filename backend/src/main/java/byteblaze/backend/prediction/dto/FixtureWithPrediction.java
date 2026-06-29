@@ -15,6 +15,7 @@ public record FixtureWithPrediction(
         List<PlayerSummary> awaySquad,
         MyPrediction userPrediction,
         OffsetDateTime lockedAt,
-        boolean locked
+        boolean locked,
+        boolean knockout
 ) {
 }

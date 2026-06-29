@@ -7,6 +7,7 @@ import java.util.List;
 public record UpsertPredictionRequest(
         Long winnerTeamId,
         boolean predictedDraw,
+        Long penaltyWinnerTeamId,
         Integer homeScore,
         Integer awayScore,
         @Valid List<PlayerPick> scorers,

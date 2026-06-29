@@ -2,7 +2,7 @@
 
 The single source of truth for what's built, how it works, and where to find the code. Phase plans in `.claude/` are the history; this document is the current state.
 
-> **Status snapshot:** Phases 1–3 are merged. Phase 4's per-fixture locks and score-driven pick caps are shipped. **Pick counts** (each scorer/assister pick carries a predicted goal/assist count, V12) are shipped on top. The browse-leagues 500 fix and Phase 3's notifications subsystem remain unshipped. See §15.
+> **Status snapshot:** Phases 1–3 are merged. Phase 4's per-fixture locks and score-driven pick caps are shipped. **Pick counts** (each scorer/assister pick carries a predicted goal/assist count, V12) are shipped on top. **Per-league assister toggle** (V13), **admin result correction** (V14), and **knockout penalties** (V15 — draw = level after 120', optional "wins on penalties" pick, owner-toggleable mid-season) are shipped. The browse-leagues 500 fix and Phase 3's notifications subsystem remain unshipped. See §15.
 
 ---
 
@@ -146,6 +146,9 @@ Eleven Flyway migrations (`backend/src/main/resources/db/migration/`):
 | `V10__league_overall_predictions.sql` | `app.league_overall_predictions`, `app.league_overall_scores` |
 | `V11__leagues_archived.sql` | `leagues.archived BOOLEAN` + index |
 | `V12__prediction_pick_counts.sql` | `prediction_scorers.count`, `prediction_assisters.count` (NOT NULL DEFAULT 1, CHECK ≥ 1) |
+| `V13__league_scoring_rules_assisters_enabled.sql` | `league_scoring_rules.assisters_enabled BOOLEAN` (per-league assister toggle) |
+| `V14__fixtures_manually_overridden.sql` | `fixtures.manually_overridden BOOLEAN` (admin result correction; sync skips overridden fixtures) |
+| `V15__knockout_penalties.sql` | `fixtures.penalty_home_score/away_score`, `predictions.penalty_winner_team_id`, `league_scoring_rules.penalties_enabled/penalty_winner_points/penalties_enabled_at` + CHECK |
 
 ### 4.1 `app.users`
 
@@ -271,6 +274,7 @@ app.predictions                                       -- scalar per-match predic
   user_id, league_id, fixture_id    UNIQUE (user_id, league_id, fixture_id)
   winner_team_id BIGINT             -- NULL for draw or unpredicted
   predicted_draw BOOLEAN            -- disambiguates "draw" from "no pick"
+  penalty_winner_team_id BIGINT     -- V15: who wins the shootout (knockout draws only)
   home_score, away_score INT        -- nullable
   created_at, updated_at TIMESTAMP
 
@@ -317,6 +321,16 @@ One row per league. The `league_id` is both PK and FK.
 Constraints enforced at DB level (CHECK), service layer (Bean Validation), and frontend (`types/scoring.ts`).
 
 V9 also backfills a defaults row for every pre-existing league via `ON CONFLICT DO NOTHING`.
+
+**V13** adds `assisters_enabled BOOLEAN DEFAULT TRUE` — when off, assisters are hidden from the prediction UI and excluded from scoring, and the match bonus re-tiers to three categories. **V15** adds:
+
+| Column | Range | Default |
+|---|---|---|
+| `penalty_winner_points` | 0..50 | 5 |
+| `penalties_enabled` | bool | false |
+| `penalties_enabled_at` | timestamp | NULL |
+
+`penalties_enabled` is the only rule an owner can flip **after** the post-prediction freeze (via a dedicated endpoint). `penalties_enabled_at` is (re-)stamped on each enable; the scoring engine awards penalty points only for fixtures whose lock time (`kickoff − 15m`) is after it — i.e. matches still open when penalties were turned on.
 
 ### 4.9 `app.league_overall_predictions` & `app.league_overall_scores` (V10)
 
@@ -775,6 +789,9 @@ Pure function, table-driven, called per `(prediction, fixture, events, rules)`:
 | Exact score | both `homeScore` and `awayScore` match | `match_exact_score_points` once |
 | Scorer | **per pick**: actual goals by that player (own goals excluded) **exactly equals** the predicted `count` | `match_scorer_points` per correct pick |
 | Assister | **per pick**: actual assists by that player exactly equals the predicted `count` | `match_assister_points` per correct pick |
+| Penalty winner (V15) | knockout, penalties enabled & fixture open at enable-time, fixture ended `PEN`, predicted shootout winner is correct | `penalty_winner_points` once |
+
+A match's stored `home_score`/`away_score` are the **120-minute** result (the API's top-level `goals`, after extra time, excluding the shootout) — so a match decided in extra time (`AET`) reads as a win, and only a penalty shootout (`PEN`, level after 120') reads as a draw. The penalty-winner pick is a **separate category** that counts toward the bonus.
 
 Scorer/assister scoring is **additive and exact**. Two different players at count=1 both correct → 2 × `match_scorer_points`. Predicting one player at count=2 when they scored 1 goal → 0 points for that pick. A player scoring more goals than predicted is also incorrect (exact-match both ways).
 
@@ -788,6 +805,8 @@ multiplier = 4 → rules.match_bonus_4x
 
 final_points = round(baseTotal × multiplier)
 ```
+
+With knockout penalties enabled a match can hit a 5th category (penalty winner). There is no 5× tier — **4 or more categories** earns `match_bonus_4x` (and, as before, hitting every *available* category earns the top bonus, so 3-of-3 with assisters disabled still maps to 4×).
 
 The `breakdown` JSONB preserves per-pick `playerId`, `predicted`, `actual`, `correct`, `points` inside `scorers[]` / `assisters[]`, plus `categoriesHit`, `baseTotal`, `multiplier`, `total`, and `ruleSetVersion` (the rules' `updated_at` as ms-epoch). Lets the UI render "Haaland 2/2 ✓ + Foden 1/1 ✓ = 6 × 1.5 = 9" and supports retroactive rule audits.
 
@@ -933,6 +952,7 @@ All endpoints are `/api/v1/...`. Errors use RFC 7807 `ProblemDetail` (`applicati
 |---|---|---|---|
 | GET | `/leagues/{id}/scoring-rules` | member | Rules + `editable` |
 | PUT | `/leagues/{id}/scoring-rules` | owner | Update; 423 if not editable |
+| PATCH | `/leagues/{id}/scoring-rules/penalties` | owner/admin | Flip `penaltiesEnabled`; **not** frozen by the editable gate |
 
 ### 14.6 Season-end predictions (`overall/controller/`)
 

@@ -3,6 +3,7 @@ package byteblaze.backend.prediction.service;
 import byteblaze.backend.auth.entity.User;
 import byteblaze.backend.auth.repository.UserRepository;
 import byteblaze.backend.fixture.entity.Fixture;
+import byteblaze.backend.fixture.entity.FixtureRounds;
 import byteblaze.backend.fixture.repository.FixtureRepository;
 import byteblaze.backend.league.entity.League;
 import byteblaze.backend.league.exception.LeagueNotFoundException;
@@ -170,6 +171,7 @@ public class PredictionServiceImpl implements PredictionService {
         Long competitionId = league.getCompetition().getId();
         Integer seasonYear = league.getSeasonYear();
         boolean assistersEnabled = assistersEnabled(leagueId);
+        boolean penaltiesEnabled = penaltiesEnabled(leagueId);
 
         List<Fixture> fixtures = fixtureRepository
                 .findAllByCompetitionIdAndSeasonYearAndRound(competitionId, seasonYear, round);
@@ -178,7 +180,7 @@ public class PredictionServiceImpl implements PredictionService {
                 .toList();
 
         if (fixtures.isEmpty()) {
-            return new GameweekFixturesResponse(round, null, false, assistersEnabled, List.of());
+            return new GameweekFixturesResponse(round, null, false, assistersEnabled, penaltiesEnabled, List.of());
         }
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -284,6 +286,7 @@ public class PredictionServiceImpl implements PredictionService {
                 my = new MyPrediction(
                         prediction.getWinnerTeamId(),
                         prediction.isPredictedDraw(),
+                        prediction.getPenaltyWinnerTeamId(),
                         prediction.getHomeScore(),
                         prediction.getAwayScore(),
                         scorersByPredictionId.getOrDefault(prediction.getId(), List.of()),
@@ -308,7 +311,8 @@ public class PredictionServiceImpl implements PredictionService {
                     awaySquad,
                     my,
                     fixtureLockedAt,
-                    fixtureLocked
+                    fixtureLocked,
+                    FixtureRounds.isKnockout(f.getRound())
             ));
         }
 
@@ -322,7 +326,7 @@ public class PredictionServiceImpl implements PredictionService {
         boolean responseLocked = fixtures.stream()
                 .allMatch(f -> !now.isBefore(f.getKickoffAt().minusMinutes(15)));
 
-        return new GameweekFixturesResponse(round, responseLocksAt, responseLocked, assistersEnabled, out);
+        return new GameweekFixturesResponse(round, responseLocksAt, responseLocked, assistersEnabled, penaltiesEnabled, out);
     }
 
     @Override
@@ -408,6 +412,7 @@ public class PredictionServiceImpl implements PredictionService {
                     p.getUserId().equals(currentUserId),
                     p.getWinnerTeamId(),
                     p.isPredictedDraw(),
+                    p.getPenaltyWinnerTeamId(),
                     p.getHomeScore(),
                     p.getAwayScore(),
                     scorers,
@@ -496,6 +501,27 @@ public class PredictionServiceImpl implements PredictionService {
         prediction.setHomeScore(req.homeScore());
         prediction.setAwayScore(req.awayScore());
 
+        // Penalty-shootout pick. Only meaningful for a draw prediction on a
+        // knockout fixture in a penalties-enabled league; otherwise silently
+        // dropped (tolerant of older/over-eager clients). When it does apply it
+        // must name one of the two teams and accompany a draw.
+        Long penaltyWinnerTeamId = null;
+        if (req.penaltyWinnerTeamId() != null
+                && penaltiesEnabled(leagueId)
+                && FixtureRounds.isKnockout(fixture.getRound())) {
+            Long pick = req.penaltyWinnerTeamId();
+            if (!pick.equals(fixture.getHomeTeamId()) && !pick.equals(fixture.getAwayTeamId())) {
+                throw new PredictionValidationException(
+                        "penaltyWinnerTeamId must match one of the teams in this fixture");
+            }
+            if (!predictedDraw) {
+                throw new PredictionValidationException(
+                        "A penalty winner can only be set when predicting a draw");
+            }
+            penaltyWinnerTeamId = pick;
+        }
+        prediction.setPenaltyWinnerTeamId(penaltyWinnerTeamId);
+
         prediction = predictionRepository.save(prediction);
         UUID predictionId = prediction.getId();
 
@@ -532,6 +558,7 @@ public class PredictionServiceImpl implements PredictionService {
         return new MyPrediction(
                 prediction.getWinnerTeamId(),
                 prediction.isPredictedDraw(),
+                prediction.getPenaltyWinnerTeamId(),
                 prediction.getHomeScore(),
                 prediction.getAwayScore(),
                 scorers,
@@ -552,6 +579,17 @@ public class PredictionServiceImpl implements PredictionService {
         return leagueScoringRulesRepository.findById(leagueId)
                 .map(LeagueScoringRules::isAssistersEnabled)
                 .orElse(true);
+    }
+
+    /**
+     * Whether knockout penalty predictions are enabled for this league (V15).
+     * Defaults to {@code false} when the rules row is missing, matching the
+     * column default.
+     */
+    private boolean penaltiesEnabled(UUID leagueId) {
+        return leagueScoringRulesRepository.findById(leagueId)
+                .map(LeagueScoringRules::isPenaltiesEnabled)
+                .orElse(false);
     }
 
     private League requireLeagueAndMembership(UUID leagueId, User currentUser) {
@@ -750,6 +788,7 @@ public class PredictionServiceImpl implements PredictionService {
             return new ScoreBreakdown(
                     root.path("winner").asInt(0),
                     root.path("score").asInt(0),
+                    root.path("penalty").asInt(0),
                     parseScoreLines(root.path("scorers"), nameById),
                     parseScoreLines(root.path("assisters"), nameById),
                     root.path("categoriesHit").asInt(0),

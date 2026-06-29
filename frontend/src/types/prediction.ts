@@ -39,6 +39,7 @@ export interface ScoreLine {
 export interface ScoreBreakdown {
   winnerPoints: number;
   scorePoints: number;
+  penaltyPoints: number;
   scorers: ScoreLine[];
   assisters: ScoreLine[];
   categoriesHit: number;
@@ -50,6 +51,7 @@ export interface ScoreBreakdown {
 export interface MyPrediction {
   winnerTeamId: number | null;
   predictedDraw: boolean;
+  penaltyWinnerTeamId: number | null;
   homeScore: number | null;
   awayScore: number | null;
   scorers: PlayerPick[];
@@ -71,6 +73,7 @@ export interface FixtureWithPrediction {
   userPrediction: MyPrediction | null;
   lockedAt: string;
   locked: boolean;
+  knockout: boolean;
 }
 
 export interface GameweekFixtures {
@@ -78,12 +81,14 @@ export interface GameweekFixtures {
   locksAt: string | null;
   locked: boolean;
   assistersEnabled: boolean;
+  penaltiesEnabled: boolean;
   fixtures: FixtureWithPrediction[];
 }
 
 export interface UpsertPredictionRequest {
   winnerTeamId: number | null;
   predictedDraw: boolean;
+  penaltyWinnerTeamId: number | null;
   homeScore: number | null;
   awayScore: number | null;
   scorers: PlayerPick[];
@@ -102,6 +107,7 @@ export interface OtherPrediction {
   isCurrentUser: boolean;
   winnerTeamId: number | null;
   predictedDraw: boolean;
+  penaltyWinnerTeamId: number | null;
   homeScore: number | null;
   awayScore: number | null;
   scorers: PlayerPickView[];
